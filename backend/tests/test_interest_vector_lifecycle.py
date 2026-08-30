@@ -19,10 +19,19 @@ from app.services.interest_vector_service import (
 
 
 @pytest.mark.asyncio
-async def test_trigger_creates_tracked_task():
+async def test_trigger_creates_tracked_task(monkeypatch: pytest.MonkeyPatch):
     """trigger_vector_rebuild registers the task in _rebuild_tasks."""
     _rebuild_tasks.clear()
     _rebuild_user_dedup.clear()
+
+    async def fail_rebuild(*_args, **_kwargs):
+        raise RuntimeError("simulated rebuild failure")
+
+    # The lifecycle assertion should not depend on PostgreSQL query latency.
+    monkeypatch.setattr(
+        "app.services.interest_vector_service.rebuild_user_vector",
+        fail_rebuild,
+    )
 
     trigger_vector_rebuild(999)
 

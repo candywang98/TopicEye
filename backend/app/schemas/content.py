@@ -1,14 +1,23 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, JsonValue, field_serializer
+from pydantic import BaseModel, BeforeValidator, Field, JsonValue, field_serializer
 
 from app.schemas._normalizers import StrList, normalize_str_list
 from app.schemas.analysis import AiAnalysisResponse
 from app.services.content_summary import clean_content_summary
 from app.services.zhihu_url import normalize_zhihu_url
 
-normalize_content_tags = normalize_str_list
+
+def normalize_content_tags(value) -> list[str]:
+    """Normalize content tags while tolerating malformed legacy containers."""
+    try:
+        return normalize_str_list(value)
+    except ValueError:
+        return []
+
+
+ContentTags = Annotated[list[str], BeforeValidator(normalize_content_tags)]
 
 
 class ContentResponse(BaseModel):
@@ -28,7 +37,7 @@ class ContentResponse(BaseModel):
     cover_url: str | None = None
     category: str | None = None
     content_type: str | None = None
-    tags: StrList = Field(default_factory=list)
+    tags: ContentTags = Field(default_factory=list)
     language: str | None = None
     status: str
     is_favorited: bool = False
@@ -47,6 +56,7 @@ class ContentResponse(BaseModel):
         # Response-level fallback covers records ingested before summary
         # normalisation was introduced without changing raw article bodies.
         return clean_content_summary(value) or None
+
 
 class ContentMetricsResponse(BaseModel):
     id: int

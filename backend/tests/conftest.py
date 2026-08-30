@@ -51,6 +51,23 @@ from app.core.database import Base
 from test_database_guard import validated_test_database_url
 
 
+@pytest.fixture(autouse=True)
+def isolate_runtime_defaults(monkeypatch):
+    """Keep legacy-path tests independent from production defaults and host proxies."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ANALYTICS_ENGINE", "duckdb")
+    for key in (
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
 @pytest_asyncio.fixture
 async def test_engine():
     """内存 SQLite 引擎，schema 已初始化。每个测试独立一份。
@@ -109,18 +126,9 @@ async def clean_tables():
     async with engine.begin() as conn:
         from sqlalchemy import text
 
-        # 部分测试会经模块级全局 engine 留下跨事件循环的未提交事务
-        # （idle in transaction），TRUNCATE 会因拿不到锁无限阻塞、拖死整
-        # 个套件；清表前先终止同库的其它后端连接（套件单进程串行，安全）。
-        await conn.execute(
-            text(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE datname = current_database() AND pid <> pg_backend_pid()"
-            )
-        )
-        # 兜底：pg_terminate_backend 可能因权限/竞态未完全释放锁，
-        # 设 5s lock_timeout 让 TRUNCATE 快速失败而非无限阻塞，
-        # 失败时测试会报错而非拖死整个套件直到 6h 超时。
+        # 测试环境的全局 engine 使用 NullPool，连接随 session 关闭，不会把
+        # 跨事件循环连接留在池中。lock_timeout 仍作为泄漏检测：若某个测试
+        # 未释放事务，下一次清表会快速失败并暴露具体问题。
         await conn.execute(text("SET LOCAL lock_timeout = '5s'"))
         # TRUNCATE 所有表,PostgreSQL 支持 CASCADE 自动清理外键依赖
         table_names = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
@@ -201,6 +209,15 @@ async def reset_llm_provider_state():
         pass
 
     yield
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def drain_background_tasks():
+    """Cancel tracked fire-and-forget tasks before the test loop closes."""
+    yield
+    from app.services.interest_vector_service import drain_rebuild_tasks
+
+    await drain_rebuild_tasks(timeout=1.0)
 
 
 def _admin_sync_url(database: str = "postgres") -> str:

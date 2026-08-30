@@ -24,6 +24,14 @@ def test_database_url_required():
         Settings(_env_file=None, DATABASE_URL="")
 
 
+def test_analytics_engine_defaults_to_postgres(monkeypatch):
+    monkeypatch.delenv("ANALYTICS_ENGINE", raising=False)
+
+    settings = Settings(_env_file=None, DATABASE_URL=_TEST_DB_URL)
+
+    assert settings.ANALYTICS_ENGINE == "postgres"
+
+
 def test_cors_origins_defaults_empty(monkeypatch):
     """CORS_ORIGINS 默认为空字符串，cors_origins 属性返回空列表。"""
     # litellm 导入时会 load_dotenv() 把 backend/.env 写入 os.environ，

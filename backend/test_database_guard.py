@@ -22,9 +22,7 @@ def validated_test_database_url() -> str:
 
     url = make_url(raw_url)
     if os.environ.get(TEST_TRUNCATE_OPT_IN) != "true":
-        raise UnsafeTestDatabaseError(
-            f"Refusing destructive test setup without {TEST_TRUNCATE_OPT_IN}=true"
-        )
+        raise UnsafeTestDatabaseError(f"Refusing destructive test setup without {TEST_TRUNCATE_OPT_IN}=true")
     if url.get_backend_name() != "postgresql" or url.database != TEST_DATABASE_NAME:
         raise UnsafeTestDatabaseError(
             "Refusing destructive test setup unless DATABASE_URL targets "

@@ -47,7 +47,8 @@ LEFT JOIN LATERAL (
 
 async def _scored_items(db: AsyncSession, *, days: int) -> list[dict[str, Any]]:
     cutoff = datetime.now(UTC) - timedelta(days=days)
-    result = await db.execute(text(f"""
+    result = await db.execute(
+        text(f"""
         SELECT c.id, c.source_id,
                COALESCE(s.name, c.source_name, '未知') AS source_name,
                LOWER(COALESCE(s.source_type::text, c.source_type::text, 'unknown')) AS source_type,
@@ -60,7 +61,9 @@ async def _scored_items(db: AsyncSession, *, days: int) -> list[dict[str, Any]]:
         {_LATEST_ANALYSIS_JOIN}
         LEFT JOIN sources s ON s.id = c.source_id
         WHERE {_BASE_SCOPE} AND a.curation_score IS NOT NULL
-    """), {"cutoff": cutoff})
+    """),
+        {"cutoff": cutoff},
+    )
     rows = [dict(row._mapping) for row in result.all()]
     feedback = await get_feedback_scores(db, [int(row["id"]) for row in rows])
     for row in rows:
@@ -99,13 +102,18 @@ async def build_overview(db: AsyncSession, *, days: int, scored: list[dict[str, 
     today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     if scored is None:
         scored = await _scored_items(db, days=days)
-    row = (await db.execute(text(f"""
+    row = (
+        await db.execute(
+            text(f"""
         SELECT COUNT(c.id) AS total,
                COUNT(c.id) FILTER (WHERE a.curation_score IS NOT NULL) AS analyzed,
                COUNT(c.id) FILTER (WHERE c.crawled_at >= :today) AS today_new
         FROM content_items c {_LATEST_ANALYSIS_JOIN}
         WHERE {_BASE_SCOPE}
-    """), {"cutoff": cutoff, "today": today})).one()
+    """),
+            {"cutoff": cutoff, "today": today},
+        )
+    ).one()
     return {
         "total": int(row.total or 0),
         "analyzed": int(row.analyzed or 0),
@@ -120,7 +128,9 @@ async def build_source_distribution(db: AsyncSession, *, days: int, scored: list
     if scored is None:
         scored = await _scored_items(db, days=days)
     selected = _selected_by_source(scored)
-    rows = (await db.execute(text(f"""
+    rows = (
+        await db.execute(
+            text(f"""
         SELECT COALESCE(s.name, c.source_name, '未知') AS source_name,
                LOWER(COALESCE(s.source_type::text, c.source_type::text, 'unknown')) AS source_type,
                COUNT(c.id) AS content_count
@@ -128,33 +138,52 @@ async def build_source_distribution(db: AsyncSession, *, days: int, scored: list
         LEFT JOIN sources s ON s.id = c.source_id
         WHERE {_BASE_SCOPE}
         GROUP BY 1, 2 ORDER BY content_count DESC LIMIT 20
-    """), {"cutoff": cutoff})).all()
-    return {"sources": [
-        {
-            "source_name": row.source_name,
-            "source_type": row.source_type,
-            "content_count": int(row.content_count or 0),
-            "curated_count": selected.get((row.source_name, row.source_type), 0),
-            "curation_rate": round(selected.get((row.source_name, row.source_type), 0) / int(row.content_count) * 100, 1)
-            if row.content_count else 0,
-        }
-        for row in rows
-    ]}
+    """),
+            {"cutoff": cutoff},
+        )
+    ).all()
+    return {
+        "sources": [
+            {
+                "source_name": row.source_name,
+                "source_type": row.source_type,
+                "content_count": int(row.content_count or 0),
+                "curated_count": selected.get((row.source_name, row.source_type), 0),
+                "curation_rate": round(
+                    selected.get((row.source_name, row.source_type), 0) / int(row.content_count) * 100, 1
+                )
+                if row.content_count
+                else 0,
+            }
+            for row in rows
+        ]
+    }
 
 
 async def build_category_distribution(db: AsyncSession, *, days: int) -> dict:
     cutoff = datetime.now(UTC) - timedelta(days=days)
-    rows = (await db.execute(text(f"""
+    rows = (
+        await db.execute(
+            text(f"""
         SELECT COALESCE(c.category, '未分类') AS category, COUNT(c.id) AS content_count,
                ROUND(AVG(a.curation_score)::numeric, 1) AS avg_score
         FROM content_items c {_LATEST_ANALYSIS_JOIN}
         WHERE {_BASE_SCOPE}
         GROUP BY c.category ORDER BY content_count DESC
-    """), {"cutoff": cutoff})).all()
-    return {"categories": [
-        {"category": row.category, "content_count": int(row.content_count or 0), "avg_score": float(row.avg_score or 0)}
-        for row in rows
-    ]}
+    """),
+            {"cutoff": cutoff},
+        )
+    ).all()
+    return {
+        "categories": [
+            {
+                "category": row.category,
+                "content_count": int(row.content_count or 0),
+                "avg_score": float(row.avg_score or 0),
+            }
+            for row in rows
+        ]
+    }
 
 
 async def build_daily_trend(db: AsyncSession, *, days: int, scored: list[dict[str, Any]] | None = None) -> dict:
@@ -162,24 +191,31 @@ async def build_daily_trend(db: AsyncSession, *, days: int, scored: list[dict[st
     if scored is None:
         scored = await _scored_items(db, days=days)
     selected = _selected_by_date(scored)
-    rows = (await db.execute(text(f"""
+    rows = (
+        await db.execute(
+            text(f"""
         SELECT c.crawled_at::date AS crawl_date, COUNT(c.id) AS content_count,
                COUNT(c.id) FILTER (WHERE a.id IS NOT NULL) AS analyzed_count,
                ROUND(AVG(a.curation_score)::numeric, 1) AS avg_curation
         FROM content_items c {_LATEST_ANALYSIS_JOIN}
         WHERE {_BASE_SCOPE}
         GROUP BY c.crawled_at::date ORDER BY crawl_date
-    """), {"cutoff": cutoff})).all()
-    return {"trend": [
-        {
-            "date": row.crawl_date.isoformat(),
-            "content_count": int(row.content_count or 0),
-            "curated_count": selected.get(row.crawl_date.isoformat(), 0),
-            "analyzed_count": int(row.analyzed_count or 0),
-            "avg_curation": float(row.avg_curation or 0),
-        }
-        for row in rows
-    ]}
+    """),
+            {"cutoff": cutoff},
+        )
+    ).all()
+    return {
+        "trend": [
+            {
+                "date": row.crawl_date.isoformat(),
+                "content_count": int(row.content_count or 0),
+                "curated_count": selected.get(row.crawl_date.isoformat(), 0),
+                "analyzed_count": int(row.analyzed_count or 0),
+                "avg_curation": float(row.avg_curation or 0),
+            }
+            for row in rows
+        ]
+    }
 
 
 async def build_novel_platforms(db: AsyncSession) -> dict:
@@ -190,11 +226,13 @@ async def build_novel_platforms(db: AsyncSession) -> dict:
     fanqie = await count_and_max(FanqieBook, FanqieBook.crawled_at)
     qimao = await count_and_max(QimaoBook, QimaoBook.crawled_at)
     zhihu = await count_and_max(ZhihuAlbum, ZhihuAlbum.updated_at)
-    return {"platforms": [
-        {"name": "番茄小说", "table": "fanqie", "count": fanqie[0], "last_sync": fanqie[1]},
-        {"name": "七猫小说", "table": "qimao", "count": qimao[0], "last_sync": qimao[1]},
-        {"name": "知乎盐选", "table": "zhihu", "count": zhihu[0], "last_sync": zhihu[1]},
-    ]}
+    return {
+        "platforms": [
+            {"name": "番茄小说", "table": "fanqie", "count": fanqie[0], "last_sync": fanqie[1]},
+            {"name": "七猫小说", "table": "qimao", "count": qimao[0], "last_sync": qimao[1]},
+            {"name": "知乎盐选", "table": "zhihu", "count": zhihu[0], "last_sync": zhihu[1]},
+        ]
+    }
 
 
 async def build_dashboard(db: AsyncSession, *, days: int) -> dict:
@@ -214,11 +252,11 @@ async def build_dashboard(db: AsyncSession, *, days: int) -> dict:
         "kpi": {
             "total_crawled": overview["total"],
             "total_curated": len(selected),
-            "avg_curation": round(sum(float(item.get("curation_score") or 0) for item in scored) / len(scored), 1) if scored else 0,
+            "avg_curation": round(sum(float(item.get("curation_score") or 0) for item in scored) / len(scored), 1)
+            if scored
+            else 0,
             "active_sources": len({item.get("source_id") for item in scored if item.get("source_id") is not None}),
         },
-        "source_breakdown": [
-            {**source, "avg_score": 0} for source in sources["sources"]
-        ],
+        "source_breakdown": [{**source, "avg_score": 0} for source in sources["sources"]],
         "daily_trend": trend["trend"],
     }

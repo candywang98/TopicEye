@@ -24,6 +24,7 @@ overriding the scoring engine's base ranking.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import math
 from collections import defaultdict
@@ -329,13 +330,32 @@ async def drain_rebuild_tasks(timeout: float = 10.0) -> None:
     cancelled first (so it stops new DB work) and then awaited so
     that any in-flight session is rolled back and closed.
     """
+    current_loop = asyncio.get_running_loop()
     tasks = list(_rebuild_tasks)
-    for task in tasks:
-        task.cancel()
     if not tasks:
         return
-    await asyncio.wait(tasks, timeout=timeout)
-    # Clear registries after drain
+
+    current_loop_tasks: list[asyncio.Task] = []
+    for task in tasks:
+        task_loop = task.get_loop()
+        if task_loop.is_closed() or task_loop is not current_loop:
+            # A task left behind by a finished test loop cannot be awaited from
+            # this loop. Drop its bookkeeping; the old loop owns its cleanup.
+            _rebuild_tasks.discard(task)
+            continue
+        if not task.done():
+            task.cancel()
+        current_loop_tasks.append(task)
+
+    if current_loop_tasks:
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(
+                asyncio.gather(*current_loop_tasks, return_exceptions=True),
+                timeout=timeout,
+            )
+
+    # Clear registries after drain, including dedup entries for completed and
+    # cross-loop tasks that cannot be awaited here.
     _rebuild_tasks.clear()
     _rebuild_user_dedup.clear()
 

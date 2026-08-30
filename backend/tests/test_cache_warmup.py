@@ -12,7 +12,7 @@ from app.models.source import Source, SourceStatus, SourceType
 from app.models.trending import TrendingCategory, TrendingItem, TrendingSnapshot, TrendingSource
 from app.services import cache_warmup
 from app.services.content_list_cache import home_content_list_cache_params
-from app.services.json_cache import get_cached_json, invalidate_json_cache
+from app.services.json_cache import get_cached_json, invalidate_json_cache, set_cached_json
 from app.services.scoring_flow import (
     SCORING_FLOW_WARMUP_TARGETS,
     get_cached_scoring_flow_json,
@@ -127,6 +127,13 @@ async def cache_warmup_session(monkeypatch):
     invalidate_json_cache()
     invalidate_scoring_flow_cache()
     monkeypatch.setattr(cache_warmup, "async_session", session_factory)
+
+    async def fake_warmup_stats_workspace():
+        for key in STATS_WORKSPACE_CACHE_KEYS:
+            set_cached_json(key, {"test": True})
+        return list(STATS_WORKSPACE_CACHE_KEYS)
+
+    monkeypatch.setattr(cache_warmup, "warmup_stats_workspace", fake_warmup_stats_workspace)
     await seed_cache_warmup_fixture(session_factory)
 
     yield session_factory

@@ -63,6 +63,7 @@ fi
 echo "==> 运行测试（${PYTHON}）..."
 cd "$BACKEND_DIR"
 DATABASE_URL="postgresql+asyncpg://topiceye:topiceye@127.0.0.1:${PORT}/topiceye_test" \
+APP_ENV=test \
 ALLOW_TEST_DATABASE_TRUNCATE=true \
 EXPECTED_TEST_DATABASE_HOST=127.0.0.1 \
 EXPECTED_TEST_DATABASE_PORT="${PORT}" \

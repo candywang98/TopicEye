@@ -45,10 +45,7 @@ def test_source_contracts_are_present_in_openapi():
 
 def test_204_source_delete_routes_are_explicitly_bodyless():
     routes = {
-        (method, route.path): route
-        for route in app.routes
-        if isinstance(route, APIRoute)
-        for method in route.methods
+        (method, route.path): route for route in app.routes if isinstance(route, APIRoute) for method in route.methods
     }
     for route_key in {
         ("DELETE", "/api/v1/sources/me/{source_id}"),

@@ -3,6 +3,7 @@ import logging
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.db_backend import create_database_profile
@@ -11,13 +12,22 @@ logger = logging.getLogger(__name__)
 
 database_profile = create_database_profile(settings.DATABASE_URL)
 
+_test_environment = settings.APP_ENV.strip().lower() in {"test", "testing"}
+_pool_options = (
+    {"poolclass": NullPool}
+    if _test_environment
+    else {
+        "pool_size": settings.DB_POOL_SIZE,
+        "max_overflow": settings.DB_MAX_OVERFLOW,
+        "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
+    }
+)
+
 engine = create_async_engine(
     database_profile.url,
     echo=False,
     pool_pre_ping=True,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_recycle=settings.DB_POOL_RECYCLE_SECONDS,
+    **_pool_options,
 )
 
 

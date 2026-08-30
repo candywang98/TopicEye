@@ -49,7 +49,7 @@ async def _content(
     source_name: str,
     owner_user_id: int | None = None,
 ) -> ContentItem:
-    moment = datetime(2026, 7, 29, 8, tzinfo=UTC) + timedelta(hours=hour)
+    moment = datetime.now(UTC) - timedelta(hours=12) + timedelta(hours=hour)
     content = ContentItem(
         title=title,
         url=f"https://example.com/{source_name}/{hour}",
@@ -131,6 +131,8 @@ async def test_write_recalls_historical_canonical_and_replays_idempotently(
             source_name="AIHOT",
         )
         await db.commit()
+        incoming_id = incoming.id
+        group_id = group.id
 
         async def fail_llm(*args, **kwargs):
             raise AssertionError("historical exact match must stay on local path")
@@ -152,9 +154,9 @@ async def test_write_recalls_historical_canonical_and_replays_idempotently(
             idempotency_key="historical-write",
         )
 
-        member = await db.scalar(select(ContentEventMember).where(ContentEventMember.content_id == incoming.id))
+        member = await db.scalar(select(ContentEventMember).where(ContentEventMember.content_id == incoming_id))
         assert member is not None
-        assert member.event_group_id == group.id
+        assert member.event_group_id == group_id
         assert first_result["created_members"] == 1
         assert replay_result["run_id"] == first_result["run_id"]
         assert replay_result["replayed"] is True

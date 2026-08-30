@@ -4,7 +4,6 @@ import pytest
 
 from test_database_guard import UnsafeTestDatabaseError, validated_test_database_url
 
-
 _TEST_URL = "postgresql+asyncpg://topiceye:topiceye@127.0.0.1:5433/topiceye_test"
 
 

@@ -17,6 +17,14 @@ from app.services.content_pipeline import _update_source_error
 from app.services.scraper_http import build_scraper_client_kwargs
 
 
+@pytest.fixture(autouse=True)
+def allow_public_source_urls(monkeypatch):
+    async def allow(_url):
+        return None
+
+    monkeypatch.setattr(content_pipeline, "ensure_public_hostname", allow)
+
+
 def test_update_source_error_uses_readable_fallback_for_blank_message():
     source = Source(
         name="Broken API",

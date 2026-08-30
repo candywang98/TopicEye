@@ -588,7 +588,9 @@ async def health_ready():
             "backend": database_profile.backend,
             **diagnostics,
             "analytics": analytics_status,
-            "duckdb": analytics_status if settings.ANALYTICS_ENGINE == "duckdb" else {"status": "disabled", "available": False},
+            "duckdb": analytics_status
+            if settings.ANALYTICS_ENGINE == "duckdb"
+            else {"status": "disabled", "available": False},
         },
         "scheduler": {"running": scheduler_running},
     }
