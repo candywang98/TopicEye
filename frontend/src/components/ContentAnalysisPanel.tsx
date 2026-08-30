@@ -9,6 +9,11 @@ import { X } from 'lucide-react';
 import { Badge, cx } from '@/components/ui';
 import type { ContentAnalysis, RecommendLevel } from '@/types';
 import { explainRecommendation } from '@/lib/recommendation';
+import {
+  extractCreatorAngles,
+  extractKeyPoints,
+  extractTitleSuggestions,
+} from '@/lib/utils';
 import ScoreBreakdownChart from '@/components/ScoreBreakdownChart';
 import { useDialogFocus } from '@/components/useDialogFocus';
 
@@ -21,6 +26,9 @@ export default function ContentAnalysisPanel({ analysis, onClose }: Props) {
   const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
   const recommendation = explainRecommendation(analysis);
   const level = recommendation.level;
+  const keyPoints = extractKeyPoints(analysis);
+  const creatorAngles = extractCreatorAngles(analysis);
+  const titleSuggestions = extractTitleSuggestions(analysis);
 
   const scores = [
     { label: '质量', value: analysis.quality_score, color: '#3498db' },
@@ -107,10 +115,10 @@ export default function ContentAnalysisPanel({ analysis, onClose }: Props) {
       </Section>
 
       {/* Key Points */}
-      {analysis.key_points && analysis.key_points.length > 0 && (
+      {keyPoints.length > 0 && (
         <Section title="核心观点">
           <ul className="m-0 pl-[18px]">
-            {analysis.key_points.map((pt, i) => (
+            {keyPoints.map((pt, i) => (
               <li key={i} className="mb-1 text-[13px] leading-7 text-gray-700">
                 {pt}
               </li>
@@ -120,10 +128,10 @@ export default function ContentAnalysisPanel({ analysis, onClose }: Props) {
       )}
 
       {/* Creator Angles */}
-      {analysis.creator_angles && analysis.creator_angles.length > 0 && (
+      {creatorAngles.length > 0 && (
         <Section title="创作角度">
           <div className="flex flex-col gap-2">
-            {analysis.creator_angles.map((angle, i) => (
+            {creatorAngles.map((angle, i) => (
               <div
                 key={i}
                 className="rounded-lg border-l-[3px] border-primary bg-gray-50 px-3.5 py-2.5 text-[13px] leading-7 text-gray-700"
@@ -136,10 +144,10 @@ export default function ContentAnalysisPanel({ analysis, onClose }: Props) {
       )}
 
       {/* Title Suggestions */}
-      {analysis.title_suggestions && analysis.title_suggestions.length > 0 && (
+      {titleSuggestions.length > 0 && (
         <Section title="建议标题">
           <div className="flex flex-col gap-1.5">
-            {analysis.title_suggestions.map((t, i) => (
+            {titleSuggestions.map((t, i) => (
               <div
                 key={i}
                 className="rounded bg-teal-light px-3 py-2 text-[13px] text-gray-700"

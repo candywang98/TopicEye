@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Panel, cx } from '@/components/ui';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
 import { LoadingState, EmptyState } from '@/components/StateView';
@@ -30,7 +30,8 @@ const FEEDBACK_LABELS: Record<string, string> = {
 };
 
 export default function ScoringDashboardPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [data, setData] = useState<ScoringDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { BookOpen, Compass, FileText, PenLine, Video } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import SectionTitle from '@/components/SectionTitle';
 import { Button, Panel, Toolbar, cx } from '@/components/ui';
 import CreationPlanDisplay, { type CreationPlan } from '@/components/CreationPlanDisplay';
@@ -14,7 +14,7 @@ interface TopicCreationGeneratorProps {
 }
 
 export default function TopicCreationGenerator({ contentId }: TopicCreationGeneratorProps) {
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [creationPlan, setCreationPlan] = useState<CreationPlan | null>(null);
   const [creating, setCreating] = useState(false);
   const [creatingPlatform, setCreatingPlatform] = useState<string | null>(null);

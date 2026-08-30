@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, cx, type Tone } from '@/components/ui';
 import { ErrorState, LoadingState } from '@/components/StateView';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
@@ -76,7 +76,8 @@ function fromDateInput(s: string): string | null {
 }
 
 export default function AdminUpdatesPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [statusFilter, setStatusFilter] = useState<'all' | ProductUpdateStatus>('all');
   const [versionQuery, setVersionQuery] = useState('');
   const [editing, setEditing] = useState<ProductUpdateItem | null>(null);

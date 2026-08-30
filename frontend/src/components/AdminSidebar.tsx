@@ -10,6 +10,7 @@ import {
   BrainCircuit,
   GitMerge,
   LayoutDashboard,
+  LoaderCircle,
   LogOut,
   MessageSquareWarning,
   Newspaper,
@@ -23,7 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cx } from '@/components/ui';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 
 interface AdminNavItem {
   id: string;
@@ -54,7 +55,26 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, authLoading, logout } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
+  const localMode = useAuthStore((state) => state.localMode);
+  const logout = useAuthStore((state) => state.logout);
+  const [navigation, setNavigation] = React.useState<{ href: string; fromPath: string } | null>(null);
+  const [, startNavigation] = React.useTransition();
+
+  const pendingHref = navigation?.fromPath === pathname ? navigation.href : null;
+
+  React.useEffect(() => {
+    if (!pendingHref) return;
+    const timeout = window.setTimeout(() => setNavigation(null), 30_000);
+    return () => window.clearTimeout(timeout);
+  }, [pendingHref]);
+
+  const navigate = (href: string) => {
+    if (pendingHref) return;
+    setNavigation({ href, fromPath: pathname });
+    startNavigation(() => router.push(href));
+  };
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin';
@@ -90,7 +110,8 @@ export default function AdminSidebar() {
       <div className="px-3 pb-3">
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={() => navigate('/')}
+          disabled={Boolean(pendingHref)}
           className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-xs text-slate-400 transition hover:bg-slate-800 hover:text-white"
         >
           <ArrowLeft size={14} strokeWidth={2} />
@@ -103,16 +124,19 @@ export default function AdminSidebar() {
         {ADMIN_NAV_ITEMS.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
+          const pending = pendingHref === item.href;
           return (
             <button
               key={item.id}
               type="button"
               aria-current={active ? 'page' : undefined}
+              aria-busy={pending || undefined}
+              disabled={Boolean(pendingHref) && !item.href.startsWith('/dashboard')}
               onClick={() => {
                 if (item.href.startsWith('/dashboard')) {
                   window.open(item.href, '_blank');
-                } else {
-                  router.push(item.href);
+                } else if (!active) {
+                  navigate(item.href);
                 }
               }}
               className={cx(
@@ -120,9 +144,14 @@ export default function AdminSidebar() {
                 active
                   ? 'bg-amber-500/15 font-semibold text-amber-400'
                   : 'font-normal text-slate-400 hover:bg-slate-800 hover:text-white',
+                pendingHref && !pending ? 'cursor-wait opacity-60' : '',
               )}
             >
-              <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+              {pending ? (
+                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+              )}
               <span>{item.label}</span>
             </button>
           );
@@ -139,19 +168,21 @@ export default function AdminSidebar() {
               </div>
               <div className="flex items-center gap-1 text-[10px] text-amber-500">
                 <ShieldCheck size={10} strokeWidth={2.4} />
-                管理员
+                {localMode ? '本地工作区' : '管理员'}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={authLoading}
-              aria-label="退出登录"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-slate-500 transition hover:bg-slate-800 hover:text-red-400"
-              title="退出登录"
-            >
-              <LogOut size={14} strokeWidth={2} />
-            </button>
+            {!localMode && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={authLoading}
+                aria-label="退出登录"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-slate-500 transition hover:bg-slate-800 hover:text-red-400"
+                title="退出登录"
+              >
+                <LogOut size={14} strokeWidth={2} />
+              </button>
+            )}
           </div>
         )}
       </div>

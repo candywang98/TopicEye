@@ -13,7 +13,7 @@ import {
   Rss,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import { EmptyState, LoadingState } from '@/components/StateView';
 import {
@@ -44,6 +44,7 @@ import {
   type CrossPlatformSourceItem,
   type PersistentTopic,
 } from '@/lib/api';
+import { isAbortError } from '@/lib/api/_core';
 import { timeAgoShort as formatTime } from '@/lib/datetime';
 
 /* ── Constants ── */
@@ -52,7 +53,7 @@ import { timeAgoShort as formatTime } from '@/lib/datetime';
 /* ── Page ── */
 
 function TrendingPage() {
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [tab, setTab] = useState<'list' | 'resonance' | 'persistent'>('list');
   const [items, setItems] = useState<TrendingItem[]>([]);
   const [sources, setSources] = useState<TrendingSource[]>([]);
@@ -64,6 +65,7 @@ function TrendingPage() {
     resonanceCount: 0,
     persistentCount: 0,
   });
+  const [statsUnavailable, setStatsUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -72,7 +74,7 @@ function TrendingPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSource, setSelectedSource] = useState('');
 
-  const fetchList = useCallback(async () => {
+  const fetchList = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -82,58 +84,68 @@ function TrendingPage() {
         source: selectedSource || undefined,
         exclude_sources: ['heiyan', 'ishugui'],
         limit: 200,
-      });
+      }, { signal });
+      if (signal?.aborted) return;
       setItems(itemList);
     } catch (e) {
+      if (signal?.aborted || isAbortError(e)) return;
       setError(e instanceof Error ? e.message : '趋势数据加载失败');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [selectedCategory, selectedSource]);
 
-  const fetchClusters = useCallback(async () => {
+  const fetchClusters = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await trendingApi.crossPlatform({ min_resonance: minResonance, limit: 50 });
+      const data = await trendingApi.crossPlatform({ min_resonance: minResonance, limit: 50 }, { signal });
+      if (signal?.aborted) return;
       setClusters(data.clusters || []);
       if (minResonance === 2) {
         setStats(prev => ({ ...prev, resonanceCount: data.total ?? data.clusters?.length ?? 0 }));
       }
     } catch (e) {
+      if (signal?.aborted || isAbortError(e)) return;
       setError(e instanceof Error ? e.message : '共振数据加载失败');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [minResonance]);
 
-  const fetchPersistent = useCallback(async () => {
+  const fetchPersistent = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await trendingApi.persistent({ min_days: 2, min_sources: 1, days_back: 7 });
+      const data = await trendingApi.persistent({ min_days: 2, min_sources: 1, days_back: 7 }, { signal });
+      if (signal?.aborted) return;
       setPersistentTopics(data.topics || []);
       setStats(prev => ({ ...prev, persistentCount: data.total ?? data.topics?.length ?? 0 }));
     } catch (e) {
+      if (signal?.aborted || isAbortError(e)) return;
       setError(e instanceof Error ? e.message : '持续热度数据加载失败');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (tab === 'list') fetchList();
-    else if (tab === 'resonance') fetchClusters();
-    else fetchPersistent();
+    const controller = new AbortController();
+    if (tab === 'list') void fetchList(controller.signal);
+    else if (tab === 'resonance') void fetchClusters(controller.signal);
+    else void fetchPersistent(controller.signal);
+    return () => controller.abort();
   }, [tab, fetchList, fetchClusters, fetchPersistent]);
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
     try {
       const [srcList, resonance, persistent] = await Promise.all([
-        trendingApi.listSources(),
-        trendingApi.crossPlatform({ min_resonance: 2, limit: 50 }),
-        trendingApi.persistent({ min_days: 2, min_sources: 1, days_back: 7 }),
+        trendingApi.listSources({ signal }),
+        trendingApi.crossPlatform({ min_resonance: 2, limit: 50 }, { signal }),
+        trendingApi.persistent({ min_days: 2, min_sources: 1, days_back: 7 }, { signal }),
       ]);
+      if (signal?.aborted) return;
+      setStatsUnavailable(false);
       setStats({
         sourceCount: srcList.length,
         sampleCount: srcList.reduce((sum, source) => sum + source.count, 0),
@@ -142,12 +154,15 @@ function TrendingPage() {
       });
       setSources(prev => (prev.length > 0 ? prev : srcList));
     } catch (e) {
-      console.error('Failed to fetch trending stats:', e);
+      if (signal?.aborted || isAbortError(e)) return;
+      setStatsUnavailable(true);
     }
   }, []);
 
   useEffect(() => {
-    fetchStats();
+    const controller = new AbortController();
+    void fetchStats(controller.signal);
+    return () => controller.abort();
   }, [fetchStats]);
 
   const handleSyncAll = async () => {
@@ -230,6 +245,9 @@ function TrendingPage() {
           <StatTile icon={Activity} label="共振" value={stats.resonanceCount} hint="最低 2 平台" colorClass="text-red" />
           <StatTile icon={Clock3} label="持续" value={stats.persistentCount} hint="近 7 天持续话题" colorClass="text-amber" />
         </div>
+        {statsUnavailable && (
+          <p className="mb-0 mt-2 text-[11px] text-amber-700">辅助统计暂不可用，榜单内容不受影响。</p>
+        )}
       </Panel>
 
       <div className="mt-4.5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-4.5 max-xl:grid-cols-1">

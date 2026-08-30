@@ -12,7 +12,7 @@ import {
   Users,
   UserPlus,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel } from '@/components/ui';
 import { usersApi } from '@/lib/api';
 import type { UserListItem } from '@/lib/api';
@@ -27,7 +27,8 @@ type FilterRole = '' | 'user' | 'admin';
 type FilterStatus = '' | 'active' | 'banned';
 
 export default function UsersAdminPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [items, setItems] = useState<UserListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);

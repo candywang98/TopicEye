@@ -82,7 +82,7 @@ export const CREATION_PLATFORMS: Array<{ id: string; label: string; icon: Lucide
   { id: 'douyin', label: '抖音', icon: PenLine },
 ];
 
-export const FAVORITES_PAGE_SIZE = 200;
+export const FAVORITES_PAGE_SIZE = 60;
 
 /** 提取收藏项的摘要文本（去除 HTML 标签，最长 180 字符） */
 export function getSnapshotText(item: FavoriteItem): string {

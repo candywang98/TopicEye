@@ -6,6 +6,27 @@
 import { request } from './_core';
 import type { ContentScoringResult, MotherTopic, MotherTopicMutation } from '@/types/trending';
 import type { FanqieBook, FanqieCategory, QimaoBook, WebnovelWeeklyReport, ZhihuAlbum, ZhihuCategory } from '@/types/webnovel';
+import type { ContentItem } from '@/types';
+
+export interface MotherTopicCandidate {
+  content: ContentItem;
+  score: number;
+  top_topic: string | null;
+  topic_scores: ContentScoringResult['topic_scores'];
+  matched_keywords: Array<{ keyword: string; weight: number }>;
+  freshness: number;
+}
+
+export interface MotherTopicCandidatesResponse {
+  items: MotherTopicCandidate[];
+  total: number;
+  page: number;
+  page_size: number;
+  topic_stats: Array<{ topic_id: number; count: number; best_score: number }>;
+  main_count: number;
+  reserve_count: number;
+  average_score: number;
+}
 
 // ─── Mother Topics API ──────────────────────────────────────────────
 
@@ -13,6 +34,20 @@ export const motherTopicsApi = {
   /** 列出母题（scope=mine 用户隔离视图，scope=all admin 审计全量） */
   list(active_only = false, scope: 'mine' | 'all' = 'mine'): Promise<MotherTopic[]> {
     return request(`/mother-topics?active_only=${active_only}&scope=${scope}`);
+  },
+
+  candidates(params: {
+    topic_id?: number;
+    min_score?: number;
+    page?: number;
+    page_size?: number;
+  }, options: RequestInit = {}): Promise<MotherTopicCandidatesResponse> {
+    const query = new URLSearchParams();
+    if (params.topic_id !== undefined) query.set('topic_id', String(params.topic_id));
+    if (params.min_score !== undefined) query.set('min_score', String(params.min_score));
+    if (params.page !== undefined) query.set('page', String(params.page));
+    if (params.page_size !== undefined) query.set('page_size', String(params.page_size));
+    return request(`/mother-topics/candidates?${query.toString()}`, options);
   },
 
   /** 创建母题 */

@@ -19,18 +19,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_admin_user
+from app.core.config import settings
 from app.core.database import async_session, get_db
 from app.schemas.trend import TrendEvidenceResponse
 from app.services import duckdb_service
 from app.services.trends import (
+    get_keyword_cloud,
     get_keyword_trend_evidence,
     get_topic_trend_evidence,
+    get_topic_trends,
     snapshot_daily_trends,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trends", tags=["trends"])
-ANALYTICS_HEADERS = {"X-Analytics-Backend": "duckdb"}
 
 
 @router.post("/snapshot", dependencies=[Depends(get_current_admin_user)])
@@ -49,14 +51,19 @@ async def trigger_snapshot(
 async def topic_trends(
     response: Response,
     days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get topic trend data for charts through DuckDB."""
+    """Get topic trend data using the configured analytics engine."""
     try:
-        trends = await duckdb_service.run_query(lambda: duckdb_service.query_trend_topics(days=days))
+        if settings.ANALYTICS_ENGINE == "duckdb":
+            trends = await duckdb_service.run_query(lambda: duckdb_service.query_trend_topics(days=days))
+        else:
+            trends = await get_topic_trends(db, days=days)
     except Exception as exc:
-        logger.exception("DuckDB topic trend query failed")
-        raise HTTPException(status_code=503, detail="DuckDB analytical layer unavailable") from exc
-    response.headers.update(ANALYTICS_HEADERS)
+        logger.exception("Topic trend query failed")
+        engine_label = "DuckDB" if settings.ANALYTICS_ENGINE == "duckdb" else "PostgreSQL"
+        raise HTTPException(status_code=503, detail=f"{engine_label} analytical layer unavailable") from exc
+    response.headers["X-Analytics-Backend"] = settings.ANALYTICS_ENGINE
     return {"days": days, "trends": trends}
 
 
@@ -65,14 +72,21 @@ async def keyword_cloud(
     response: Response,
     days: int = Query(7, ge=1, le=30),
     limit: int = Query(50, ge=10, le=200),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get keyword frequency for word cloud visualization through DuckDB."""
+    """Get keyword frequency using the configured analytics engine."""
     try:
-        keywords = await duckdb_service.run_query(lambda: duckdb_service.query_keyword_cloud(days=days, limit=limit))
+        if settings.ANALYTICS_ENGINE == "duckdb":
+            keywords = await duckdb_service.run_query(
+                lambda: duckdb_service.query_keyword_cloud(days=days, limit=limit)
+            )
+        else:
+            keywords = await get_keyword_cloud(db, days=days, limit=limit)
     except Exception as exc:
-        logger.exception("DuckDB keyword cloud query failed")
-        raise HTTPException(status_code=503, detail="DuckDB analytical layer unavailable") from exc
-    response.headers.update(ANALYTICS_HEADERS)
+        logger.exception("Keyword cloud query failed")
+        engine_label = "DuckDB" if settings.ANALYTICS_ENGINE == "duckdb" else "PostgreSQL"
+        raise HTTPException(status_code=503, detail=f"{engine_label} analytical layer unavailable") from exc
+    response.headers["X-Analytics-Backend"] = settings.ANALYTICS_ENGINE
     return {"days": days, "keywords": keywords}
 
 

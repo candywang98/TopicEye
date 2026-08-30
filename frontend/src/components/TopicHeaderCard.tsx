@@ -5,7 +5,7 @@ import { BookOpen, ExternalLink, Star } from 'lucide-react';
 import { Button, Panel, cx } from '@/components/ui';
 import LevelBadge from '@/components/LevelBadge';
 import SourceBadge from '@/components/SourceBadge';
-import { useAppContext } from '@/components/ClientLayout';
+import { useReaderStore } from '@/providers/AppProvider';
 import type { ContentItem, ContentAnalysis, RecommendLevel } from '@/types';
 
 interface TopicHeaderCardProps {
@@ -29,7 +29,7 @@ export default function TopicHeaderCard({
   onToggleFavorite,
   timeAgoStr,
 }: TopicHeaderCardProps) {
-  const { openReader } = useAppContext();
+  const openReader = useReaderStore((state) => state.openReader);
   return (
     <Panel className="mb-5 p-8">
       {/* Level + Tags */}

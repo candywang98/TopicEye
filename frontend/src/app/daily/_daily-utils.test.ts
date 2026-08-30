@@ -6,6 +6,7 @@ import {
   pickKey,
   isEnglishTitle,
   displaySourceTitle,
+  dailyPickTopicHref,
   marksMapFromResp,
   groupByCategory,
   EDITION_LABELS,
@@ -109,6 +110,16 @@ describe('displaySourceTitle', () => {
 
   it('无 source_title 时返回空字符串', () => {
     expect(displaySourceTitle({}, false)).toBe('');
+  });
+});
+
+describe('dailyPickTopicHref', () => {
+  it('有 content_id 时链接到现有选题详情', () => {
+    expect(dailyPickTopicHref({ content_id: 42 })).toBe('/topics/42');
+  });
+
+  it('没有 content_id 时不生成死链接', () => {
+    expect(dailyPickTopicHref({})).toBeNull();
   });
 });
 

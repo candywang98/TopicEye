@@ -13,6 +13,7 @@
  */
 
 import type { ContentItem, RecommendLevel } from '@/types';
+import { normalizeTagList } from '@/lib/utils';
 
 export const TIME_RANGE_HOURS: Record<string, number | undefined> = {
   '24h': 24,
@@ -35,13 +36,7 @@ export function getContentTime(item: ContentItem): string {
 }
 
 export function normalizeTags(rawTags: unknown): string[] {
-  if (Array.isArray(rawTags)) {
-    return rawTags.map((tag) => String(tag).trim()).filter(Boolean);
-  }
-  if (typeof rawTags === 'string' && rawTags.trim()) {
-    return rawTags.split(',').map((tag) => tag.trim()).filter(Boolean);
-  }
-  return [];
+  return normalizeTagList(rawTags);
 }
 
 export function getItemTags(item: ContentItem): string[] {

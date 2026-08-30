@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.content_repo import ContentRepo, ScoringContentRow
 from app.repositories.ignored_repo import IgnoredRepo
+from app.schemas._normalizers import normalize_str_list
 from app.services.feedback_signal import get_feedback_scores
 from app.services.json_cache import (
     get_cached_json as _get_cached_json,
@@ -469,7 +470,10 @@ def string_list(value: Any) -> list[str]:
         if raw is None:
             return
         if isinstance(raw, str):
-            items.extend(part.strip() for part in raw.split(",") if part.strip())
+            try:
+                items.extend(normalize_str_list(raw))
+            except ValueError:
+                items.extend(part.strip() for part in raw.split(",") if part.strip())
             return
         if isinstance(raw, dict):
             for child in raw.values():

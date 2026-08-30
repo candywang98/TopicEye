@@ -4,10 +4,12 @@ Shared context builders for periodical AI digests.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.repositories.content_repo import ContentRepo
 from app.services.duckdb_service import query_content_for_weekly, run_query
 from app.services.scoring_engine import ScoringInput, score_items
 
@@ -18,9 +20,50 @@ async def fetch_analyzed_content(
     end_date: str,
 ) -> list[dict]:
     """Fetch analyzed content and apply the unified scoring gate for digests."""
-    _ = db
-    rows = await run_query(lambda: query_content_for_weekly(start_date=start_date, end_date=end_date))
+    if settings.ANALYTICS_ENGINE == "duckdb":
+        rows = await run_query(lambda: query_content_for_weekly(start_date=start_date, end_date=end_date))
+    else:
+        rows = await _query_content_via_postgres(db, start_date=start_date, end_date=end_date)
     return _score_digest_rows(rows)
+
+
+async def _query_content_via_postgres(db: AsyncSession, *, start_date: str, end_date: str) -> list[dict]:
+    """Build the legacy digest candidate shape from eager-loaded ORM rows."""
+    items = await ContentRepo(db).list_for_report_window(
+        window_start=datetime.combine(date.fromisoformat(start_date), datetime.min.time(), tzinfo=UTC),
+        window_end=datetime.combine(date.fromisoformat(end_date) + timedelta(days=1), datetime.min.time(), tzinfo=UTC),
+        visible_user_id=None,
+    )
+    rows: list[dict] = []
+    for item in items:
+        if not item.analyses:
+            continue
+        analysis = item.analyses[-1]
+        rows.append(
+            {
+                "id": item.id,
+                "title": item.title,
+                "url": item.url,
+                "source_name": item.source_name,
+                "category": item.category or "未分类",
+                "summary": analysis.summary or item.summary,
+                "recommendation": analysis.recommendation,
+                "crawled_at": item.crawled_at,
+                "curation_score": analysis.curation_score or 0,
+                "info_density": analysis.info_density or 50,
+                "actionability": analysis.actionability or 50,
+                "source_weight": analysis.source_weight or 50,
+                "creator_score": analysis.creator_score or 0,
+                "viral_score": analysis.viral_score or 0,
+                "freshness_score": analysis.freshness_score or 50,
+                "quality_score": analysis.quality_score or 0,
+                "hot_score": analysis.hot_score or 0,
+                "risk_score": analysis.risk_score or 0,
+                "source_weight_db": item.source.weight if item.source else 3,
+                "feedback_score": 0,
+            }
+        )
+    return rows
 
 
 async def fetch_analyzed_content_with_expanded_window(

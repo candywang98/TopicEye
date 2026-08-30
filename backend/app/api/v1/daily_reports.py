@@ -19,8 +19,16 @@ from app.repositories.pick_mark_repo import PickMarkRepository
 from app.schemas.daily_report import (
     DailyReportCalendarResponse,
     DailyReportDatesResponse,
+    DailyReportGenerateVersionResponse,
     DailyReportListResponse,
     DailyReportResponse,
+    DailyReportSparklineResponse,
+    DailyReportWebhookPushResponse,
+    PickMarkDeleteResponse,
+    PickMarkListResponse,
+    PickMarkMutationResponse,
+    WebhookDeliveryLogListResponse,
+    YesterdayTrackingResponse,
 )
 from app.services.daily_report import LOCAL_TZ, WEEKDAYS, generate_daily_report, get_latest_today_report
 from app.services.plan_catalog import plan_allows_private_source
@@ -213,7 +221,7 @@ async def trigger_generate(db: AsyncSession = Depends(get_db)):
     return report
 
 
-@router.post("/generate-version")
+@router.post("/generate-version", response_model=DailyReportGenerateVersionResponse)
 async def trigger_generate_version(
     target_date: str | None = Query(None, description="Target date in YYYY-MM-DD, defaults to today"),
     edition: str | None = Query(None, description="snapshot/noon/evening/final/manual"),
@@ -307,7 +315,7 @@ async def trigger_generate_version(
     )
 
 
-@router.post("/push-webhook")
+@router.post("/push-webhook", response_model=DailyReportWebhookPushResponse)
 async def push_daily_report_webhook(
     date: str = Query(..., description="Report date in YYYY-MM-DD format"),
     edition: str | None = Query(None, description="Optional edition filter"),
@@ -410,7 +418,7 @@ def _extract_sparkline_keywords(title: str, limit: int = 4) -> list[str]:
     return result
 
 
-@router.get("/sparkline")
+@router.get("/sparkline", response_model=DailyReportSparklineResponse)
 async def get_sparkline(
     title: str = Query(..., min_length=2, max_length=200, description="选题标题"),
     hours: int = Query(48, ge=4, le=168, description="时间窗口小时数"),
@@ -656,7 +664,7 @@ def _safe_json_loads(value) -> list | dict | None:
         return None
 
 
-@router.get("/yesterday-tracking")
+@router.get("/yesterday-tracking", response_model=YesterdayTrackingResponse)
 async def get_yesterday_tracking(
     report_date: str = Query(..., description="今日报告日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
@@ -668,7 +676,7 @@ async def get_yesterday_tracking(
     return await _build_yesterday_tracking_public(db, report_date=report_date, owner_user_id=None)
 
 
-@router.get("/me/yesterday-tracking")
+@router.get("/me/yesterday-tracking", response_model=YesterdayTrackingResponse)
 async def get_my_yesterday_tracking(
     report_date: str = Query(..., description="今日报告日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
@@ -711,7 +719,7 @@ async def _build_yesterday_tracking_public(
 # ── 选题标记（写这个/观察/跳过）──────────────────────────────
 
 
-@router.get("/pick-marks")
+@router.get("/pick-marks", response_model=PickMarkListResponse)
 async def list_pick_marks(
     report_date: str = Query(None, description="按日期过滤（YYYY-MM-DD）"),
     db: AsyncSession = Depends(get_db),
@@ -738,7 +746,7 @@ async def list_pick_marks(
     }
 
 
-@router.post("/pick-marks")
+@router.post("/pick-marks", response_model=PickMarkMutationResponse)
 async def upsert_pick_mark(
     body: dict,
     db: AsyncSession = Depends(get_db),
@@ -783,7 +791,7 @@ async def upsert_pick_mark(
     return {"status": "ok", "action": action}
 
 
-@router.delete("/pick-marks")
+@router.delete("/pick-marks", response_model=PickMarkDeleteResponse)
 async def delete_pick_mark(
     report_date: str = Query(...),
     pick_title: str = Query(...),
@@ -800,7 +808,7 @@ async def delete_pick_mark(
     return {"status": "deleted"}
 
 
-@router.get("/webhook-logs")
+@router.get("/webhook-logs", response_model=WebhookDeliveryLogListResponse)
 async def list_webhook_delivery_logs(
     event_type: str | None = Query(None, description="Filter by event type"),
     limit: int = Query(50, ge=1, le=200),

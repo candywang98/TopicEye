@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, ShieldCheck } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopBar from '@/components/AdminTopBar';
 import { Panel } from '@/components/ui';
@@ -13,8 +13,13 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) router.replace('/login');
+  }, [authLoading, currentUser, router]);
 
   // 加载中：显示骨架
   if (authLoading) {
@@ -28,11 +33,8 @@ export default function AdminLayout({
     );
   }
 
-  // 未登录：跳转登录页
+  // 未登录：effect 执行跳转，render 期间只显示过渡态
   if (!currentUser) {
-    if (typeof window !== 'undefined') {
-      router.replace('/login');
-    }
     return (
       <div className="flex h-dvh items-center justify-center bg-page">
         <div className="inline-flex items-center gap-2 text-sm font-bold text-gray-500">

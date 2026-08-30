@@ -4,10 +4,11 @@ Daily Report schema — request/response models.
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, BeforeValidator, Field, JsonValue, RootModel, field_serializer
 
+from app.schemas._normalizers import JsonDict, StrList, normalize_json_list
 from app.services.zhihu_url import normalize_zhihu_url
 
 
@@ -40,13 +41,13 @@ class DailyReportResponse(BaseModel):
     window_end: datetime | None = None
     cutoff_at: datetime | None = None
     source_scope: str = "curated"
-    source_item_ids: Any | None = None
+    source_item_ids: Annotated[list[int], BeforeValidator(normalize_json_list)] = Field(default_factory=list)
     overview: str | None = None
     takeaway: str | None = None
-    keywords: Any | None = None  # parsed JSON array
-    trends: Any | None = None  # parsed JSON array
-    top_picks: Any | None = None  # parsed JSON array
-    platform_tips: Any | None = None  # parsed JSON object
+    keywords: StrList = Field(default_factory=list)
+    trends: Annotated[list[dict[str, JsonValue]], BeforeValidator(normalize_json_list)] = Field(default_factory=list)
+    top_picks: Annotated[list[dict[str, JsonValue]], BeforeValidator(normalize_json_list)] = Field(default_factory=list)
+    platform_tips: JsonDict = Field(default_factory=dict)
     topic_count: int = 0
     content_count: int = 0
     analyzed_count: int = 0
@@ -115,3 +116,104 @@ class DailyReportCalendarResponse(BaseModel):
     error_count: int
     missing_count: int
     generating_count: int
+
+
+class DailyReportGenerationAcceptedResponse(BaseModel):
+    id: int
+    report_date: str
+    status: Literal["GENERATING"]
+    message: str
+
+
+class DailyReportGenerateVersionResponse(RootModel[DailyReportResponse | DailyReportGenerationAcceptedResponse]):
+    pass
+
+
+class DailyReportWebhookPushResponse(BaseModel):
+    sent: bool
+    message: str
+
+
+class DailyReportSparklinePointResponse(BaseModel):
+    ts: datetime
+    count: int
+    baseline: float | None = None
+
+
+class DailyReportSparklineResponse(BaseModel):
+    points: list[DailyReportSparklinePointResponse] = Field(default_factory=list)
+    keywords: StrList = Field(default_factory=list)
+    total: int
+    window_hours: int
+
+
+class YesterdayTrackingPickResponse(BaseModel):
+    title: str
+    source_title: str
+    rank: int
+    old_score: float | None = None
+    yesterday_lifecycle: str | None = None
+    today_score: float | None = None
+    today_lifecycle: str | None = None
+    heat_delta_pct: float | None = None
+    status: Literal["confirmed", "reversed", "persisted", "dropped"]
+
+
+class YesterdayMarkedPickResponse(BaseModel):
+    title: str
+    mark: Literal["write", "watch"]
+    category: str | None = None
+    today_score: float | None = None
+    today_lifecycle: str | None = None
+    status: Literal["persisted", "dropped"]
+
+
+class YesterdayTrackingResponse(BaseModel):
+    has_yesterday: bool
+    report_date: str
+    picks: list[YesterdayTrackingPickResponse] = Field(default_factory=list)
+    your_marked: list[YesterdayMarkedPickResponse] = Field(default_factory=list)
+
+
+class PickMarkResponse(BaseModel):
+    report_date: str
+    pick_title: str
+    action: Literal["write", "watch", "skip"]
+    pick_category: str | None = None
+    pick_source_url: str | None = None
+
+
+class PickMarkListResponse(BaseModel):
+    marks: list[PickMarkResponse] = Field(default_factory=list)
+    total: int
+
+
+class PickMarkMutationResponse(BaseModel):
+    status: Literal["ok"]
+    action: Literal["write", "watch", "skip"]
+
+
+class PickMarkDeleteResponse(BaseModel):
+    status: Literal["deleted"]
+
+
+class WebhookDeliveryLogResponse(BaseModel):
+    id: int
+    alert_key: str
+    event_type: str
+    title: str
+    severity: str
+    webhook_url_preview: str
+    status_code: int | None = None
+    success: bool
+    error_message: str | None = None
+    response_preview: str | None = None
+    duration_ms: int
+    created_at: datetime | None = None
+
+
+class WebhookDeliveryLogListResponse(BaseModel):
+    items: list[WebhookDeliveryLogResponse] = Field(default_factory=list)
+    total: int
+    limit: int
+    offset: int

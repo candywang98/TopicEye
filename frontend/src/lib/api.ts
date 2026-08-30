@@ -255,7 +255,7 @@ export const authApi = {
   },
 
   /** 已启用的 OAuth provider 列表，前端据此渲染按钮。 */
-  async oauthProviders(): Promise<{ providers: string[] }> {
+  async oauthProviders(): Promise<{ providers: string[]; local_no_login_enabled: boolean }> {
     return request('/auth/oauth/providers');
   },
 };

@@ -138,9 +138,12 @@ async def oauth_callback(request: Request, provider: str, db: AsyncSession = Dep
 
 
 @router.get("/providers")
-async def oauth_providers() -> dict[str, list[str]]:
-    """返回已配置 client_id 的 provider 列表。"""
-    return {"providers": list(ENABLED_PROVIDERS)}
+async def oauth_providers() -> dict[str, list[str] | bool]:
+    """返回账号入口配置，供首屏决定是否启用本地工作区。"""
+    return {
+        "providers": list(ENABLED_PROVIDERS),
+        "local_no_login_enabled": settings.LOCAL_NO_LOGIN_ENABLED,
+    }
 
 
 # ── userinfo 解析（provider 差异隔离在这里）─────────────────────────

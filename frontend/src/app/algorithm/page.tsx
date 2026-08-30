@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppContext } from '@/components/ClientLayout';
+import { useFavoritesStore } from '@/providers/AppProvider';
 import { analysesApi, contentsApi, feedbackApi, type FeedbackType, type ScoringFlowResponse, type ScoringFlowSample } from '@/lib/api';
 import {
   AlgorithmHeader,
@@ -47,7 +47,9 @@ function selectedStageKey(sample?: ScoringFlowSample) {
 
 export default function AlgorithmPage() {
   const router = useRouter();
-  const { favorites, favoritePendingIds, toggleFavorite } = useAppContext();
+  const favorites = useFavoritesStore((state) => state.favorites);
+  const favoritePendingIds = useFavoritesStore((state) => state.favoritePendingIds);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [data, setData] = useState<ScoringFlowResponse | null>(null);
   const [selected, setSelected] = useState<ScoringFlowSample | undefined>();

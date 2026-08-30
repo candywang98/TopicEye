@@ -1,43 +1,43 @@
 'use client';
 
 import React from 'react';
-import { AuthProvider, useAuthContext, type AuthContextType } from './AuthProvider';
-import { FavoritesProvider, useFavoritesContext, type FavoritesContextType } from './FavoritesProvider';
-import { ReaderProvider, useReaderContext, type ReaderContextType } from './ReaderProvider';
+import { AuthProvider } from './AuthProvider';
+import { FavoritesProvider } from './FavoritesProvider';
+import { ReaderProvider } from './ReaderProvider';
 import type { PrefetchData } from '@/lib/server-prefetch';
-
-// ── Combined type (backward compat with original AppContextType) ──
-
-export type AppContextType = AuthContextType & FavoritesContextType & ReaderContextType;
+import { QueryProvider } from './QueryProvider';
 
 // ── AppProvider: composes Auth → Favorites → Reader ───────────
 
 export function AppProvider({ children, initialData }: { children: React.ReactNode; initialData: PrefetchData }) {
+  // initialData 只用于首次挂载。App Router 软导航可能重新流式传入根布局 props，
+  // 但不能因此重置或重新触发已经初始化完成的客户端 stores。
+  const [stableInitialData] = React.useState(initialData);
+
   return (
-    <AuthProvider initialUser={initialData.user} initialFeatureFlags={initialData.featureFlags}>
-      <FavoritesProvider initialCounts={initialData.counts}>
-        <ReaderProvider>
-          {children}
-        </ReaderProvider>
-      </FavoritesProvider>
-    </AuthProvider>
+    <QueryProvider>
+      <AuthProvider
+        initialUser={stableInitialData.user}
+        initialUserResolved={stableInitialData.userResolved}
+        initialFeatureFlags={stableInitialData.featureFlags}
+        initialFeatureFlagsResolved={stableInitialData.featureFlagsResolved}
+        initialLocalMode={stableInitialData.localMode}
+        initialLocalModeResolved={stableInitialData.localModeResolved}
+      >
+        <FavoritesProvider initialCounts={stableInitialData.counts}>
+          <ReaderProvider>
+            {children}
+          </ReaderProvider>
+        </FavoritesProvider>
+      </AuthProvider>
+    </QueryProvider>
   );
 }
 
-// ── Backward-compatible hook: combines all three stores ──────
-// 38 个消费者继续用 useAppContext()，无需改动。
-// 新代码推荐直接使用 useAuthStore / useFavoritesStore / useReaderStore
-// 配合 selector 实现细粒度订阅，避免不必要 re-render。
-
-export function useAppContext(): AppContextType {
-  const auth = useAuthContext();
-  const favorites = useFavoritesContext();
-  const reader = useReaderContext();
-  return { ...auth, ...favorites, ...reader };
-}
-
 // Re-export individual hooks for new code that wants granular access
-export { useAuthContext, useFavoritesContext, useReaderContext };
+export { useAuthContext } from './AuthProvider';
+export { useFavoritesContext } from './FavoritesProvider';
+export { useReaderContext } from './ReaderProvider';
 
 // Re-export store hooks with selector support for new code
 export { useAuthStore } from './AuthProvider';

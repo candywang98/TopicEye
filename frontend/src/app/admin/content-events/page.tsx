@@ -9,7 +9,7 @@ import {
   ShieldAlert,
   X,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import {
   AdminModal,
   AdminModalFooter,
@@ -87,7 +87,8 @@ function resultSummary(response: ContentEventNormalizeResponse): string {
 }
 
 export default function ContentEventsAdminPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [reviewStatus, setReviewStatus] =
     useState<ContentEventReviewStatus>('pending');
   const [reviews, setReviews] = useState<ContentEventReviewItem[]>([]);

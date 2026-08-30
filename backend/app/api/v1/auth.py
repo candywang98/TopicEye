@@ -175,6 +175,10 @@ async def get_current_user(
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if settings.LOCAL_NO_LOGIN_ENABLED and not authorization:
+        from app.services.local_workspace_service import get_local_workspace_user
+
+        return await get_local_workspace_user(db)
     token = _extract_token(request, authorization)
     user = await get_user_for_token(db, token)
     if not user:
@@ -187,6 +191,10 @@ async def get_optional_current_user(
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
+    if settings.LOCAL_NO_LOGIN_ENABLED and not authorization:
+        from app.services.local_workspace_service import get_local_workspace_user
+
+        return await get_local_workspace_user(db)
     if not authorization and not request.cookies.get(settings.AUTH_COOKIE_NAME):
         return None
     try:

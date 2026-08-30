@@ -19,7 +19,7 @@ export const favoritesApi = {
     target_type?: FavoriteTargetType | '';
     status?: FavoriteStatus | '';
     keyword?: string;
-  }): Promise<PaginatedResponse<FavoriteItem>> {
+  }, options: RequestInit = {}): Promise<PaginatedResponse<FavoriteItem>> {
     const query = params
       ? '?' + new URLSearchParams(
           Object.entries(params)
@@ -27,7 +27,7 @@ export const favoritesApi = {
             .map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
-    return request(`/favorites${query}`);
+    return request(`/favorites${query}`, options);
   },
 
   /** Lightweight index — only id/target_type/target_key/target_id, no pagination. */

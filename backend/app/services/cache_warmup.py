@@ -183,11 +183,33 @@ async def warmup_today_picks(db) -> None:
 
 
 async def warmup_stats_workspace() -> list[str]:
-    from app.services.duckdb_service import run_query
-    from app.services.stats_workspace import build_default_stats_cache_payloads
+    from app.core.config import settings
 
-    # builder 内是 6 个同步 DuckDB 聚合查询，整体推到专用线程执行
-    payloads = await run_query(build_default_stats_cache_payloads)
+    if settings.ANALYTICS_ENGINE == "duckdb":
+        from app.services.duckdb_service import run_query
+        from app.services.stats_workspace import build_default_stats_cache_payloads
+
+        payloads = await run_query(build_default_stats_cache_payloads)
+    else:
+        from app.services.postgres_stats import (
+            build_category_distribution,
+            build_daily_trend,
+            build_dashboard,
+            build_novel_platforms,
+            build_overview,
+            build_source_distribution,
+        )
+
+        days = 30
+        async with async_session() as db:
+            payloads = {
+                f"stats:overview:{days}": await build_overview(db, days=days),
+                f"stats:source-distribution:{days}": await build_source_distribution(db, days=days),
+                f"stats:category-distribution:{days}": await build_category_distribution(db, days=days),
+                f"stats:daily-trend:{days}": await build_daily_trend(db, days=days),
+                "stats:novel-platforms": await build_novel_platforms(db),
+                f"stats:dashboard:{days}": await build_dashboard(db, days=days),
+            }
     for key, payload in payloads.items():
         set_cached_json(key, payload)
     return list(payloads)

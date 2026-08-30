@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, Toolbar, cx, type Tone } from '@/components/ui';
 import { ErrorState, LoadingState } from '@/components/StateView';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
@@ -172,7 +172,8 @@ export default function FeedbackPage() {
   // Menu entry moved to /changelog. This page remains accessible via direct
   // URL (e.g. admin power users / deep links) with the full workbench:
   // admin view, status machine, all-issue filters, etc.
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const isAdmin = currentUser?.role === 'admin';
   const [savingIssue, setSavingIssue] = useState(false);
   const [issueUpdatingId, setIssueUpdatingId] = useState<number | null>(null);

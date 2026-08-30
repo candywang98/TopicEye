@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -23,6 +24,48 @@ from app.api.v1 import auth as auth_api, mother_topics as mother_topics_api
 from app.core.database import Base
 from app.models.mother_topic import MotherTopic
 from app.services.auth_service import create_session, create_user
+
+
+def test_mother_topic_output_parses_legacy_json_string_keywords():
+    topic = SimpleNamespace(
+        id=1,
+        name="旧格式母题",
+        description=None,
+        keywords='["写作", "手帐"]',
+        weight=1.0,
+        content_type=None,
+        target_reader=None,
+        is_active=True,
+        display_order=0,
+        owner_user_id=None,
+        created_at=None,
+        updated_at=None,
+    )
+
+    result = mother_topics_api.MotherTopicOut.from_orm_model(topic)
+
+    assert result.keywords == ["写作", "手帐"]
+
+
+def test_mother_topic_output_parses_double_encoded_keywords():
+    topic = SimpleNamespace(
+        id=1,
+        name="双重编码母题",
+        description=None,
+        keywords='"[\\"AI\\", \\"写作\\"]"',
+        weight=1.0,
+        content_type=None,
+        target_reader=None,
+        is_active=True,
+        display_order=0,
+        owner_user_id=None,
+        created_at=None,
+        updated_at=None,
+    )
+
+    result = mother_topics_api.MotherTopicOut.from_orm_model(topic)
+
+    assert result.keywords == ["AI", "写作"]
 
 
 @pytest.mark.asyncio

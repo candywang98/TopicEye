@@ -22,10 +22,17 @@ from app.services.duckdb_service import (
     run_query,
 )
 from app.services.json_cache import get_cached_json, set_cached_json
+from app.services.postgres_stats import (
+    build_category_distribution as build_pg_category_distribution,
+    build_daily_trend as build_pg_daily_trend,
+    build_dashboard as build_pg_dashboard,
+    build_novel_platforms as build_pg_novel_platforms,
+    build_overview as build_pg_overview,
+    build_source_distribution as build_pg_source_distribution,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["stats"], dependencies=[Depends(get_current_user)])
-ANALYTICS_HEADERS = {"X-Analytics-Backend": "duckdb"}
 DEFAULT_STATS_DAYS = 30
 STATS_CACHE_KEYS = {
     "overview": "stats:overview:{days}",
@@ -53,7 +60,7 @@ def _cached_response(cache_key: str) -> Response | None:
         content=content,
         media_type="application/json",
         headers={
-            **ANALYTICS_HEADERS,
+            "X-Analytics-Backend": settings.ANALYTICS_ENGINE,
             "X-Stats-Cache": "HIT",
             "X-Stats-Cache-Age-Ms": str(round(age_seconds * 1000, 3)),
         },
@@ -65,20 +72,21 @@ def _cache_response(cache_key: str, payload: dict) -> Response:
     return Response(
         content=content,
         media_type="application/json",
-        headers={**ANALYTICS_HEADERS, "X-Stats-Cache": "MISS"},
+        headers={"X-Analytics-Backend": settings.ANALYTICS_ENGINE, "X-Stats-Cache": "MISS"},
     )
 
 
-def _raise_duckdb_unavailable(exc: Exception) -> None:
-    logger.exception("DuckDB stats query failed")
-    raise HTTPException(status_code=503, detail="DuckDB analytical layer unavailable") from exc
+def _raise_analytics_unavailable(exc: Exception) -> None:
+    logger.exception("%s stats query failed", settings.ANALYTICS_ENGINE)
+    engine_label = "DuckDB" if settings.ANALYTICS_ENGINE == "duckdb" else "PostgreSQL"
+    raise HTTPException(status_code=503, detail=f"{engine_label} analytical layer unavailable") from exc
 
 
 async def _query_response(cache_key: str, query: Callable[[], dict]) -> Response:
     try:
         payload = await run_query(query)
     except Exception as exc:
-        _raise_duckdb_unavailable(exc)
+        _raise_analytics_unavailable(exc)
     return _cache_response(cache_key, payload)
 
 
@@ -100,13 +108,13 @@ async def get_overview(days: int = Query(7, ge=1, le=90)):
         try:
             payload = await build_overview_payload(db, days=days)
         except Exception as exc:
-            _raise_duckdb_unavailable(exc)
+            _raise_analytics_unavailable(exc)
         return _cache_response(cache_key, payload)
 
 
 async def build_overview_payload(db: AsyncSession, *, days: int) -> dict:
-    """Build overview payload through DuckDB; db is accepted for cache warmup compatibility."""
-    _ = db
+    if settings.ANALYTICS_ENGINE == "postgres":
+        return await build_pg_overview(db, days=days)
     return await run_query(lambda: query_stats_overview(days=days))
 
 
@@ -117,6 +125,12 @@ async def get_source_distribution(days: int = Query(7, ge=1, le=90)):
     cached = _cached_response(cache_key)
     if cached:
         return cached
+    if settings.ANALYTICS_ENGINE == "postgres":
+        async with async_session() as db:
+            try:
+                return _cache_response(cache_key, await build_pg_source_distribution(db, days=days))
+            except Exception as exc:
+                _raise_analytics_unavailable(exc)
     return await _query_response(cache_key, lambda: query_stats_source_distribution(days=days))
 
 
@@ -127,6 +141,12 @@ async def get_category_distribution(days: int = Query(7, ge=1, le=90)):
     cached = _cached_response(cache_key)
     if cached:
         return cached
+    if settings.ANALYTICS_ENGINE == "postgres":
+        async with async_session() as db:
+            try:
+                return _cache_response(cache_key, await build_pg_category_distribution(db, days=days))
+            except Exception as exc:
+                _raise_analytics_unavailable(exc)
     return await _query_response(cache_key, lambda: query_stats_category_distribution(days=days))
 
 
@@ -137,6 +157,12 @@ async def get_daily_trend(days: int = Query(7, ge=1, le=90)):
     cached = _cached_response(cache_key)
     if cached:
         return cached
+    if settings.ANALYTICS_ENGINE == "postgres":
+        async with async_session() as db:
+            try:
+                return _cache_response(cache_key, await build_pg_daily_trend(db, days=days))
+            except Exception as exc:
+                _raise_analytics_unavailable(exc)
     return await _query_response(cache_key, lambda: query_stats_daily_trend(days=days))
 
 
@@ -147,6 +173,12 @@ async def get_novel_platform_stats():
     cached = _cached_response(cache_key)
     if cached:
         return cached
+    if settings.ANALYTICS_ENGINE == "postgres":
+        async with async_session() as db:
+            try:
+                return _cache_response(cache_key, await build_pg_novel_platforms(db))
+            except Exception as exc:
+                _raise_analytics_unavailable(exc)
     return await _query_response(cache_key, query_stats_novel_platforms)
 
 
@@ -157,4 +189,10 @@ async def get_dashboard_stats(days: int = Query(30, ge=1, le=90)):
     cached = _cached_response(cache_key)
     if cached:
         return cached
+    if settings.ANALYTICS_ENGINE == "postgres":
+        async with async_session() as db:
+            try:
+                return _cache_response(cache_key, await build_pg_dashboard(db, days=days))
+            except Exception as exc:
+                _raise_analytics_unavailable(exc)
     return await _query_response(cache_key, lambda: query_dashboard_stats(days=days))

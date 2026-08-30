@@ -28,7 +28,7 @@ import {
   Star,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Panel, cx } from '@/components/ui';
 // PanelTitle / StatTile 已收敛到公共组件层，此处 re-export 保持调用方 import 路径不变。
 export { PanelTitle } from '@/components/ui';
@@ -154,7 +154,7 @@ export function SourceMiniItem({ item }: { item: CrossPlatformSourceItem }) {
 }
 
 export function AnglePanel({ cluster }: { cluster: CrossPlatformCluster }) {
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [angles, setAngles] = useState<TrendingAngleRecommendation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

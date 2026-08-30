@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, field_serializer, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_admin_user, get_current_user
@@ -57,6 +58,18 @@ class TrendingItemOut(BaseModel):
     extra: dict | None = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("extra", mode="before")
+    @classmethod
+    def parse_legacy_extra(cls, value):
+        """兼容旧库中被二次 JSON 编码成字符串的 extra。"""
+        if not isinstance(value, str):
+            return value
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
 
     @field_serializer("url")
     def serialize_url(self, value: str) -> str:

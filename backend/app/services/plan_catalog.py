@@ -147,11 +147,19 @@ def get_plan_catalog_for_user(plan_key: str | None = None) -> dict[str, Any]:
 
 def plan_allows_private_source(plan_key: str | None) -> bool:
     """Whether the plan tier permits creating user-owned (private) sources."""
+    from app.core.config import settings
+
+    if settings.LOCAL_NO_LOGIN_ENABLED:
+        return True
     return get_tier_by_key(plan_key)["key"] in {"pro", "studio", "enterprise"}
 
 
 def private_sources_quota(plan_key: str | None) -> int:
     """Max private sources the plan allows. -1 means unlimited."""
+    from app.core.config import settings
+
+    if settings.LOCAL_NO_LOGIN_ENABLED:
+        return -1
     return int(get_tier_by_key(plan_key)["limits"].get("private_sources_quota", 0))
 
 

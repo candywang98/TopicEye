@@ -257,6 +257,35 @@ async def test_today_picks_cleans_legacy_ai_summary_and_key_points(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_today_picks_normalizes_double_encoded_json_fields(monkeypatch):
+    rows = _duckdb_rows()
+    rows[0].update(
+        {
+            "tags": '"[\\"AI\\", \\"Agent\\"]"',
+            "ai_tags": '"[\\"模型\\", \\"工程\\"]"',
+            "key_points": '"[\\"契约稳定\\", \\"缓存安全\\"]"',
+            "creator_angles": '"[\\"工程视角\\"]"',
+            "title_suggestions": '"[\\"避免切页崩溃\\"]"',
+            "risk_notes": '"{\\"notes\\": \\"\\"}"',
+            "enrichment": '"{\\"why_matters\\": \\"减少历史脏数据影响\\"}"',
+        }
+    )
+    monkeypatch.setattr(today_picks, "query_today_picks", lambda **_kwargs: rows)
+    monkeypatch.setattr(today_picks, "query_topics", lambda: [])
+
+    payload = await today_picks.build_today_picks(FailingSession(), hours=48, limit=1)
+
+    item = payload["items"][0]
+    assert item["tags"] == ["AI", "Agent"]
+    assert item["analysis"]["tags"] == ["模型", "工程"]
+    assert item["analysis"]["key_points"] == ["契约稳定", "缓存安全"]
+    assert item["analysis"]["creator_angles"] == ["工程视角"]
+    assert item["analysis"]["title_suggestions"] == ["避免切页崩溃"]
+    assert item["analysis"]["risk_notes"] == {"notes": ""}
+    assert item["analysis"]["enrichment"] == {"why_matters": "减少历史脏数据影响"}
+
+
+@pytest.mark.asyncio
 async def test_build_today_picks_filters_prescreened_items_with_unified_scorer(monkeypatch):
     query_args = []
 

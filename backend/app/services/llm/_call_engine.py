@@ -14,17 +14,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from functools import cache
 from typing import Any
 
-from litellm import RateLimitError, acompletion
-from litellm.exceptions import (  # noqa: I001 — litellm 子模块按 ruff isort 规则应与 litellm 同组
-    BadRequestError,
-    ContentPolicyViolationError,
-    ContextWindowExceededError,
-    JSONSchemaValidationError,
-    UnprocessableEntityError,
-    UnsupportedParamsError,
-)
 from tenacity import (
     retry,
     retry_if_exception,
@@ -46,6 +38,37 @@ from app.services.llm._rate_limit import (
 logger = logging.getLogger(__name__)
 
 
+async def acompletion(**kwargs):
+    """Patch-friendly lazy proxy around LiteLLM's async completion call."""
+    from litellm import acompletion as litellm_acompletion
+
+    return await litellm_acompletion(**kwargs)
+
+
+@cache
+def _litellm_exception_types() -> dict[str, type[Exception]]:
+    """Load LiteLLM's large provider registry only on the first real LLM path."""
+    from litellm import RateLimitError
+    from litellm.exceptions import (
+        BadRequestError,
+        ContentPolicyViolationError,
+        ContextWindowExceededError,
+        JSONSchemaValidationError,
+        UnprocessableEntityError,
+        UnsupportedParamsError,
+    )
+
+    return {
+        "rate_limit": RateLimitError,
+        "bad_request": BadRequestError,
+        "content_policy": ContentPolicyViolationError,
+        "context_window": ContextWindowExceededError,
+        "json_schema": JSONSchemaValidationError,
+        "unprocessable": UnprocessableEntityError,
+        "unsupported_params": UnsupportedParamsError,
+    }
+
+
 def _is_rate_limit_error(exc: Exception) -> bool:
     """Detect if an exception is a rate limit (429) error."""
     msg = str(exc).lower()
@@ -61,7 +84,7 @@ def _is_bad_request_error(exc: Exception) -> bool:
     400 是确定性错误（请求格式错误或内容被过滤），重试不会改变结果。
     典型场景：GLM/智谱 contentFilter code=1301 触发内容安全过滤。
     """
-    if isinstance(exc, BadRequestError):
+    if isinstance(exc, _litellm_exception_types()["bad_request"]):
         return True
     msg = str(exc).lower()
     return "error code: 400" in msg or ("contentfilter" in msg and "400" in msg)
@@ -74,15 +97,16 @@ def _is_deterministic_request_error(exc: Exception) -> bool:
     过滤，也不能缩短超出上下文窗口的输入。将它们计入模型失败会错误地
     冷却健康路由，并在所有模型都拒绝同一请求时打开全局熔断器。
     """
-    if isinstance(
-        exc,
-        BadRequestError
-        | ContentPolicyViolationError
-        | ContextWindowExceededError
-        | JSONSchemaValidationError
-        | UnprocessableEntityError
-        | UnsupportedParamsError,
-    ):
+    types = _litellm_exception_types()
+    deterministic_error = (
+        types["bad_request"]
+        | types["content_policy"]
+        | types["context_window"]
+        | types["json_schema"]
+        | types["unprocessable"]
+        | types["unsupported_params"]
+    )
+    if isinstance(exc, deterministic_error):
         return True
     return _is_bad_request_error(exc)
 
@@ -249,7 +273,7 @@ def _should_retry(exc: BaseException) -> bool:
 
     BadRequestError (400) 也不重试：内容过滤等确定性错误重试只会浪费时间。
     """
-    if isinstance(exc, RateLimitError) or _is_deterministic_request_error(exc):
+    if isinstance(exc, _litellm_exception_types()["rate_limit"]) or _is_deterministic_request_error(exc):
         return False
     return not _is_rate_limit_error(exc)
 

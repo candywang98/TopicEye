@@ -4,10 +4,16 @@ const path = require('path');
 const backendApiUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8102';
 
 const nextConfig = {
+  agentRules: false,
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
   allowedDevOrigins: ['localhost', '127.0.0.1', 'frontend.topiceye.orb.local'],
+  // 2GiB 本地 Docker VM 下避免连续切页时保留过多开发页面编译结果。
+  onDemandEntries: {
+    maxInactiveAge: 10 * 1000,
+    pagesBufferLength: 1,
+  },
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -15,12 +21,14 @@ const nextConfig = {
   experimental: {
     proxyTimeout: 120000,
   },
-  // macOS Docker bind mount 下 inotify 不穿透，强制 webpack 轮询以启用 HMR
+  // 只在 Docker bind mount 模式启用轮询；原生开发依赖文件系统事件，避免额外 CPU/延迟。
   webpack: (config) => {
-    config.watchOptions = {
-      poll: 1000,
-      aggregateTimeout: 300,
-    };
+    if (process.env.DOCKER_FRONTEND === 'true') {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
     return config;
   },
   // 旧 admin 路径 301 重定向到 /admin/* 新址

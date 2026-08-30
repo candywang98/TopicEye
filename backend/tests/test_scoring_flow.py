@@ -156,6 +156,22 @@ def test_build_sample_payload_includes_creator_context_fields():
     assert sample["is_favorited"] is True
 
 
+def test_build_sample_payload_normalizes_double_encoded_creator_context():
+    content = _RichContent()
+    content.analysis_tags = '"[\\"AI\\", \\"Agent\\"]"'
+    content.creator_angles = '"[\\"拆解技术路径\\", \\"评估落地成本\\"]"'
+
+    sample = build_sample_payload(
+        _breakdown(1),
+        _scoring_input(1),
+        {1: content},
+        {1: 0.0},
+    )
+
+    assert sample["tags"] == ["AI", "Agent"]
+    assert sample["creator_angles"] == ["拆解技术路径", "评估落地成本"]
+
+
 def test_build_diagnostics_explains_empty_window():
     diagnostics = build_diagnostics(
         analyzed_total=12,

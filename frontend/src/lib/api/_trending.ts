@@ -15,7 +15,7 @@ export const trendingApi = {
     source?: string;
     exclude_sources?: string[];
     limit?: number;
-  }): Promise<TrendingItem[]> {
+  }, options: RequestInit = {}): Promise<TrendingItem[]> {
     const query = params
       ? '?' + new URLSearchParams(
           Object.entries(params)
@@ -23,12 +23,12 @@ export const trendingApi = {
             .map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : String(v)])
         ).toString()
       : '';
-    return request(`/trending${query}`);
+    return request(`/trending${query}`, options);
   },
 
   /** 获取可用信源列表 */
-  async listSources(): Promise<TrendingSource[]> {
-    const data = await request<TrendingSource[] | { sources?: TrendingSource[] }>('/trending/sources');
+  async listSources(options: RequestInit = {}): Promise<TrendingSource[]> {
+    const data = await request<TrendingSource[] | { sources?: TrendingSource[] }>('/trending/sources', options);
     return Array.isArray(data) ? data : data.sources || [];
   },
 
@@ -43,7 +43,7 @@ export const trendingApi = {
   },
 
   /** 跨平台热点交叉发现 */
-  crossPlatform(params?: { min_resonance?: number; limit?: number }): Promise<{
+  crossPlatform(params?: { min_resonance?: number; limit?: number }, options: RequestInit = {}): Promise<{
     total: number;
     clusters: CrossPlatformCluster[];
   }> {
@@ -54,11 +54,11 @@ export const trendingApi = {
             .map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
-    return request(`/trending/cross-platform${query}`);
+    return request(`/trending/cross-platform${query}`, options);
   },
 
   /** 持续在榜话题分析 */
-  persistent(params?: { min_days?: number; min_sources?: number; days_back?: number }): Promise<{
+  persistent(params?: { min_days?: number; min_sources?: number; days_back?: number }, options: RequestInit = {}): Promise<{
     total: number;
     topics: PersistentTopic[];
   }> {
@@ -69,7 +69,7 @@ export const trendingApi = {
             .map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
-    return request(`/trending/persistent${query}`);
+    return request(`/trending/persistent${query}`, options);
   },
 
   /** 为共振话题生成创作角度推荐 */
@@ -79,4 +79,3 @@ export const trendingApi = {
 };
 
 // ─── Cross-Platform Clustering ───
-

@@ -3,6 +3,8 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/*.pyc
 backend/**/*.pyc
+**/__pycache__/
+*.py[cod]
 backend/*.db
 backend/*.db-shm
 backend/*.db-wal

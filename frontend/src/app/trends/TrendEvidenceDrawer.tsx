@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import EvidenceTag from '@/components/EvidenceTag';
 import SourceBadge from '@/components/SourceBadge';
-import { useAppContext } from '@/components/ClientLayout';
+import { useReaderStore } from '@/providers/AppProvider';
 import { cx } from '@/components/ui';
 import { trendsApi } from '@/lib/api';
 import type {
@@ -111,7 +111,7 @@ function DailyCounts({ data }: { data: TrendEvidenceResponse }) {
 }
 
 function EvidenceRow({ item }: { item: TrendEvidenceItem }) {
-  const { openReader } = useAppContext();
+  const openReader = useReaderStore((state) => state.openReader);
   const score = formatScore(item.score);
 
   return (

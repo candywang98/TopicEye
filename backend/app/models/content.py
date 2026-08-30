@@ -51,7 +51,7 @@ class ContentItem(Base):
     # 内容形态（双轴分类的 format 轴）：论文/技术/资讯/教程/观点/工具/体验/成长/讨论/项目
     # 由 source.category 的 `/` 分隔符解析或 LLM 分类填充
     content_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     status: Mapped[str] = mapped_column(value_enum(ContentStatus), nullable=False, default=ContentStatus.PENDING)
     is_favorited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

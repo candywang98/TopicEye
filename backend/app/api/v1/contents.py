@@ -28,7 +28,22 @@ from app.repositories.analysis_repo import AnalysisRepository
 from app.repositories.content_repo import ContentRepo
 from app.repositories.favorite_repo import FavoriteRepo
 from app.schemas.analysis import AiAnalysisResponse
-from app.schemas.content import ArticleReaderResponse, ContentListResponse, ContentResponse
+from app.schemas.content import (
+    ArticleReaderResponse,
+    ContentDetailResponse,
+    ContentEvidenceBatchResponse,
+    ContentEvidenceResponse,
+    ContentFavoriteToggleResponse,
+    ContentIgnoreResponse,
+    ContentListResponse,
+    ContentRelationsResponse,
+    ContentResponse,
+    ContentUnignoreResponse,
+    TodayCountResponse,
+    TodayPicksResponse,
+    normalize_content_tags,
+)
+from app.schemas.scoring_flow import ScoringFlowResponse
 from app.services.content_list_cache import (
     ContentListCacheParams,
     get_cached_content_list,
@@ -129,7 +144,7 @@ def _with_scoring_breakdown(item_map: dict, breakdown, scoring_input) -> dict | 
     return data
 
 
-@router.get("")
+@router.get("", response_model=ContentListResponse)
 async def list_contents(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
@@ -223,6 +238,21 @@ async def list_contents(
 
     # ── Low-follower viral discovery path ────────────────────────────────
     if sort_by == "low_follower_viral":
+        if settings.ANALYTICS_ENGINE != "duckdb":
+            from app.services.scoring_engine import score_low_follower_viral
+
+            return await _score_content_page(
+                db,
+                filters=filters,
+                ignored_ids=ignored_ids,
+                time_cutoff=time_cutoff,
+                exclude_source_types=exclude_source_types,
+                page=page,
+                page_size=page_size,
+                score_fn=score_low_follower_viral,
+                visible_user_id=current_user.id if current_user is not None else None,
+                public_only=current_user is None,
+            )
         # 优先走 DuckDB（消除 500 行 Python 批处理）；不可用时 fallback 到原路径
         try:
             from app.services.duckdb_service import get_analytics, run_query
@@ -283,7 +313,7 @@ async def list_contents(
                         "summary": clean_content_summary(raw.get("summary")),
                         "cover_url": raw.get("cover_url"),
                         "category": raw.get("category"),
-                        "tags": raw.get("tags"),
+                        "tags": normalize_content_tags(raw.get("tags")),
                         "status": raw.get("status"),
                         "topic_id": raw.get("topic_id"),
                         "created_at": raw.get("created_at"),
@@ -351,7 +381,7 @@ async def list_contents(
     return payload
 
 
-@router.get("/today-picks")
+@router.get("/today-picks", response_model=TodayPicksResponse)
 async def today_picks(
     category: str | None = Query(None, description="Filter by category"),
     content_type: str | None = Query(None, description="Filter by content type (论文/技术/资讯/...)"),
@@ -376,7 +406,7 @@ async def today_picks(
             content=content,
             media_type="application/json",
             headers={
-                "X-Analytics-Backend": "duckdb",
+                "X-Analytics-Backend": settings.ANALYTICS_ENGINE,
                 "X-Today-Picks-Cache": f"HIT; age={age_seconds:.3f}s",
             },
         )
@@ -397,15 +427,16 @@ async def today_picks(
                 content=content,
                 media_type="application/json",
                 headers={
-                    "X-Analytics-Backend": "duckdb",
+                    "X-Analytics-Backend": settings.ANALYTICS_ENGINE,
                     "X-Today-Picks-Cache": "MISS",
                 },
             )
     except Exception as exc:
-        raise HTTPException(status_code=503, detail="DuckDB analytical layer unavailable") from exc
+        engine_label = "DuckDB" if settings.ANALYTICS_ENGINE == "duckdb" else "PostgreSQL"
+        raise HTTPException(status_code=503, detail=f"{engine_label} analytical layer unavailable") from exc
 
 
-@router.get("/today-count")
+@router.get("/today-count", response_model=TodayCountResponse)
 async def today_count(current_user: User | None = Depends(get_optional_current_user)):
     """返回滚动 24 小时的内容总数 + 当日精选数。
 
@@ -482,7 +513,7 @@ async def today_count(current_user: User | None = Depends(get_optional_current_u
     )
 
 
-@router.get("/scoring-flow")
+@router.get("/scoring-flow", response_model=ScoringFlowResponse)
 async def scoring_flow(
     hours: int | None = Query(None, ge=1, le=720),
     limit: int | None = Query(None, ge=20, le=500),
@@ -737,7 +768,7 @@ async def translate_reader_content(
     )
 
 
-@router.get("/evidence-batch")
+@router.get("/evidence-batch", response_model=ContentEvidenceBatchResponse)
 async def get_evidence_batch(
     ids: str = Query(..., description="Comma-separated content IDs"),
     db: AsyncSession = Depends(get_db),
@@ -774,7 +805,7 @@ async def get_evidence_batch(
     }
 
 
-@router.get("/{content_id}")
+@router.get("/{content_id}", response_model=ContentDetailResponse)
 async def get_content(
     content_id: int,
     db: AsyncSession = Depends(get_db),
@@ -811,7 +842,7 @@ async def get_content(
     return d
 
 
-@router.get("/{content_id}/relations")
+@router.get("/{content_id}/relations", response_model=ContentRelationsResponse)
 async def get_content_relations(
     content_id: int,
     limit: int = Query(20, ge=1, le=50),
@@ -826,7 +857,7 @@ async def get_content_relations(
     return {"content_id": content_id, "relations": relations, "count": len(relations)}
 
 
-@router.post("/{content_id}/favorite")
+@router.post("/{content_id}/favorite", response_model=ContentFavoriteToggleResponse)
 async def toggle_favorite(
     content_id: int,
     db: AsyncSession = Depends(get_db),
@@ -862,7 +893,7 @@ async def toggle_favorite(
     return {"is_favorited": next_value, "favorite_id": favorite_id}
 
 
-@router.post("/{content_id}/ignore")
+@router.post("/{content_id}/ignore", response_model=ContentIgnoreResponse)
 async def ignore_content(
     content_id: int,
     reason: str = Query("not_interested", description="Ignore reason: not_interested, seen, irrelevant"),
@@ -889,7 +920,7 @@ async def ignore_content(
     return {"content_id": content_id, "ignored": True, "reason": ignored.reason}
 
 
-@router.delete("/{content_id}/ignore")
+@router.delete("/{content_id}/ignore", response_model=ContentUnignoreResponse)
 async def unignore_content(
     content_id: int,
     db: AsyncSession = Depends(get_db),
@@ -906,7 +937,7 @@ async def unignore_content(
     return {"content_id": content_id, "ignored": False, "removed": removed}
 
 
-@router.get("/{content_id}/evidence")
+@router.get("/{content_id}/evidence", response_model=ContentEvidenceResponse)
 async def get_content_evidence(
     content_id: int,
     db: AsyncSession = Depends(get_db),

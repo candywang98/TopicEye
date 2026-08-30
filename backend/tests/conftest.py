@@ -48,6 +48,7 @@ import app.models.user_integration  # noqa: F401
 import app.models.weekly_digest  # noqa: F401
 import app.models.zhihu  # noqa: F401
 from app.core.database import Base
+from test_database_guard import validated_test_database_url
 
 
 @pytest_asyncio.fixture
@@ -89,7 +90,7 @@ def _ensure_test_db_schema():
     from sqlalchemy.ext.asyncio import create_async_engine
 
     async def _init():
-        engine = create_async_engine(os.environ["DATABASE_URL"])
+        engine = create_async_engine(validated_test_database_url())
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         await engine.dispose()
@@ -103,8 +104,8 @@ def _ensure_test_db_schema():
 # autouse=True 让所有测试在执行前先清表,避免 test 间的 state pollution。
 @pytest_asyncio.fixture(autouse=True)
 async def clean_tables():
-    """每个测试前清空所有 ORM 表（PostgreSQL TRUNCATE CASCADE）。"""
-    engine = create_async_engine(os.environ["DATABASE_URL"])
+    """每个测试前清空一次性 PostgreSQL 测试库中的 ORM 表。"""
+    engine = create_async_engine(validated_test_database_url())
     async with engine.begin() as conn:
         from sqlalchemy import text
 

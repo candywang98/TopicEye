@@ -11,7 +11,7 @@ import { BASE_URL } from './_core';
 
 export const contentsApi = {
   /** 获取内容列表 */
-  list(params?: ContentFilterParams): Promise<PaginatedResponse<ContentItem>> {
+  list(params?: ContentFilterParams, options: RequestInit = {}): Promise<PaginatedResponse<ContentItem>> {
     const query = params
       ? '?' + new URLSearchParams(
           Object.entries(params)
@@ -19,7 +19,7 @@ export const contentsApi = {
             .map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
-    return request(`/contents${query}`);
+    return request(`/contents${query}`, options);
   },
 
   /** 获取单条内容 */
@@ -60,7 +60,7 @@ export const contentsApi = {
   },
 
   /** 当日精选（自动 Top 30%） */
-  todayPicks(params?: { category?: string; content_type?: string; time_range?: string; limit?: number }): Promise<{
+  todayPicks(params?: { category?: string; content_type?: string; time_range?: string; limit?: number }, options: RequestInit = {}): Promise<{
     items: ContentItem[];
     topics: TopicInfo[];
     total: number;
@@ -73,7 +73,7 @@ export const contentsApi = {
             .map(([k, v]) => [k, String(v)])
         ).toString()
       : '';
-    return request(`/contents/today-picks${query}`);
+    return request(`/contents/today-picks${query}`, options);
   },
 
   /** 获取跨源证据 */
@@ -138,7 +138,7 @@ export const viralApi = {
     sort_by?: string;
     page?: number;
     page_size?: number;
-  }): Promise<PaginatedResponse<ContentItem> & { total?: number }> {
+  }, options: RequestInit = {}): Promise<PaginatedResponse<ContentItem> & { total?: number }> {
     const page = params?.page || 1;
     const pageSize = params?.page_size || 20;
     const query = '?' + new URLSearchParams(
@@ -150,6 +150,6 @@ export const viralApi = {
         category: params?.category || '',
       }).filter(([, v]) => v !== '') as [string, string][]
     ).toString();
-    return request(`/contents${query}`);
+    return request(`/contents${query}`, options);
   },
 };

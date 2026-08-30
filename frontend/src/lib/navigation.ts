@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Crosshair,
   Flame,
-  Gem,
   GitBranch,
   Lightbulb,
   Newspaper,
@@ -84,7 +83,6 @@ export const NAV_SPACES: NavSpace[] = [
     id: 'account',
     label: '账户',
     items: [
-      { id: 'plans', label: '权益规划', href: '/plans', icon: Gem, access: 'public' },
       { id: 'changelog', label: '更新记录', href: '/changelog', icon: Rocket, access: 'public' },
     ],
   },

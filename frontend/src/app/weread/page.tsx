@@ -85,13 +85,13 @@ export default function WeReadPage() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data, loading, error, refetch } = useFetch(
-    () => contentsApi.list({
+    (signal) => contentsApi.list({
       platform: '微信读书',
       page: 1,
       page_size: SHELF_PAGE_SIZE,
       sort_by: 'published_at',
       sort_order: 'desc',
-    }),
+    }, { signal }),
     [],
   );
 

@@ -11,7 +11,7 @@ import {
   RefreshCw,
   ScrollText,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner, AdminModal } from '@/components/admin-ui';
 import { LoadingState, EmptyState } from '@/components/StateView';
@@ -30,7 +30,8 @@ const SCENE_LABELS: Record<string, string> = {
 };
 
 export default function PromptsAdminPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [items, setItems] = useState<PromptRegistryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

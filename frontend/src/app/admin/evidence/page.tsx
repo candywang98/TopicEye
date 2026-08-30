@@ -11,7 +11,7 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Panel, cx } from '@/components/ui';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
 import { LoadingState } from '@/components/StateView';
@@ -125,7 +125,8 @@ function RateBar({
 }
 
 export default function EvidenceDashboardPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [stats, setStats] = useState<EvidenceStats | null>(null);
   const [effectStats, setEffectStats] = useState<EvidenceEffectStats | null>(null);
   const [loading, setLoading] = useState(true);

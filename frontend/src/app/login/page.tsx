@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, KeyRound, LockKeyhole, Mail, Radar, UserRound } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { authApi } from '@/lib/api';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 
@@ -35,7 +35,10 @@ const OAUTH_META: Record<'google' | 'github', { label: string; Icon: (p: { class
 
 export default function LoginPage() {
   const router = useRouter();
-  const { applyAuthSession, currentUser } = useAppContext();
+  const applyAuthSession = useAuthStore((state) => state.applyAuthSession);
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const localMode = useAuthStore((state) => state.localMode);
+  const localModeLoading = useAuthStore((state) => state.localModeLoading);
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,17 +50,22 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [oauthProviders, setOauthProviders] = useState<string[]>([]);
 
+  useEffect(() => {
+    if (!localModeLoading && localMode) router.replace('/');
+  }, [localMode, localModeLoading, router]);
+
   // 拉取后端已启用的 OAuth provider 列表，决定是否渲染对应按钮
   useEffect(() => {
+    if (localMode) return;
     authApi.oauthProviders()
       .then((res) => setOauthProviders(res.providers || []))
       .catch(() => { /* 未配置或后端不可用，静默隐藏按钮 */ });
-  }, []);
+  }, [localMode]);
 
-  // 验证码倒计时
+  // 验证码倒计时（生产注册使用；本地模式会直接重定向首页）
   useEffect(() => {
     if (codeCountdown <= 0) return;
-    const timer = setTimeout(() => setCodeCountdown((c) => c - 1), 1000);
+    const timer = setTimeout(() => setCodeCountdown((count) => count - 1), 1000);
     return () => clearTimeout(timer);
   }, [codeCountdown]);
 

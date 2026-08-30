@@ -27,7 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button, Panel, cx } from '@/components/ui';
-import { useAppContext } from '@/components/ClientLayout';
+import { useReaderStore } from '@/providers/AppProvider';
 import {
   CurrentPeriodButton,
   PlatformHeading,
@@ -228,7 +228,7 @@ export default function DigestReportPage<TDigest extends DigestRecord, TSummary 
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 站内阅读：点选题标题旁的 BookOpen 打开全局 ReaderDrawer（挂在 ClientLayout，全站单实例）
-  const { openReader } = useAppContext();
+  const openReader = useReaderStore((state) => state.openReader);
 
   const loadPeriods = useCallback(async () => {
     try {

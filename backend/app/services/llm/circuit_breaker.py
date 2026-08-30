@@ -113,6 +113,12 @@ class CircuitBreaker:
                     self.cooldown_seconds,
                 )
 
+    async def release_probe(self) -> None:
+        """Release an inconclusive HALF_OPEN probe without changing health."""
+        async with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._probe_in_flight = False
+
     def status(self) -> dict:
         """当前状态快照（用于 /metrics / health 暴露）。"""
         return {

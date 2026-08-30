@@ -15,11 +15,14 @@ import {
   ArrowUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
 import Header from '@/components/Header';
 import CategoryChip from '@/components/CategoryChip';
 import { Badge, Button, Panel, Toolbar, cx } from '@/components/ui';
-import { contentCategoriesApi, contentsApi, feedbackApi } from '@/lib/api';
+import { contentsApi, feedbackApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useContentCategoriesQuery, useContentsListQuery } from '@/hooks/queries/useContentQueries';
+import { queryKeys } from '@/lib/query-keys';
 import type { FeedbackType } from '@/lib/api';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
 import type { ContentItem, ContentAnalysis, RecommendLevel } from '@/types';
@@ -54,13 +57,12 @@ const CONTENT_LOAD_STEP = 40;
 
 export default function HomePage() {
   const router = useRouter();
-  const { currentUser, toggleFavorite, refreshCounts, reportContentTotal } = useAppContext();
-  const [items, setItems] = useState<ContentItem[]>([]);
-  const [totalAvailable, setTotalAvailable] = useState(0);
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const refreshCounts = useFavoritesStore((state) => state.refreshCounts);
+  const reportContentTotal = useFavoritesStore((state) => state.reportContentTotal);
+  const queryClient = useQueryClient();
   const [contentLimit, setContentLimit] = useState(INITIAL_CONTENT_LIMIT);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(['全部']);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('全部');
   const [categoryExpanded, setCategoryExpanded] = useState(false);
@@ -74,98 +76,46 @@ export default function HomePage() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const categoriesQuery = useContentCategoriesQuery();
+  const contentParams = useMemo(() => ({
+    page_size: contentLimit,
+    hours: TIME_RANGE_HOURS[activeTimeRange],
+    source_type: activeSourceType === '全部' ? undefined : activeSourceType,
+    category: activeCategory === '全部' ? undefined : activeCategory,
+    q: searchQuery.trim() || undefined,
+    include_trend_sources: false,
+  }), [activeCategory, activeSourceType, activeTimeRange, contentLimit, searchQuery]);
+  const contentsQuery = useContentsListQuery(contentParams);
+  const items = useMemo(() => contentsQuery.data?.items ?? [], [contentsQuery.data?.items]);
+  const totalAvailable = contentsQuery.data?.total ?? items.length;
+  const loading = contentsQuery.isLoading;
+  const loadingMore = contentsQuery.isFetching && !contentsQuery.isLoading;
+
+  const categoryOptions = useMemo(() => {
+    const names = (categoriesQuery.data?.categories ?? [])
+      .map((category) => category.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    const merged = new Set(['全部', ...names]);
+    items.forEach((item) => { if (item.category) merged.add(item.category); });
+    return ['全部', ...Array.from(merged).filter((name) => name !== '全部')];
+  }, [categoriesQuery.data, items]);
+
   useEffect(() => {
-    let cancelled = false;
+    reportContentTotal(totalAvailable);
+  }, [reportContentTotal, totalAvailable]);
 
-    (async () => {
-      try {
-        const res = await contentCategoriesApi.list();
-        if (!cancelled) {
-          const names = (res.categories || [])
-            .map((category) => category.name)
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b, 'zh-CN'));
-          setCategoryOptions(['全部', ...names]);
-        }
-      } catch (err) {
-        console.warn('Load categories failed:', err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Fetch data
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setContentLimit(INITIAL_CONTENT_LIMIT);
-        setError(null);
-        const res = await contentsApi.list({
-          page_size: INITIAL_CONTENT_LIMIT,
-          hours: TIME_RANGE_HOURS[activeTimeRange],
-          source_type: activeSourceType === '全部' ? undefined : activeSourceType,
-          category: activeCategory === '全部' ? undefined : activeCategory,
-          q: searchQuery.trim() || undefined,
-          include_trend_sources: false,
-        });
-        if (!cancelled) {
-          setItems(res.items || []);
-          setTotalAvailable(res.total ?? (res.items || []).length);
-          reportContentTotal(res.total ?? 0);
-          setCategoryOptions((prev) => {
-            const merged = new Set(prev);
-            merged.add('全部');
-            (res.items || []).forEach((item) => {
-              if (item.category) merged.add(item.category);
-            });
-            return ['全部', ...Array.from(merged).filter((name) => name !== '全部').sort((a, b) => a.localeCompare(b, 'zh-CN'))];
-          });
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : '获取内容失败');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTimeRange, activeSourceType, activeCategory, searchQuery]);
+    if (contentsQuery.error) setError(contentsQuery.error instanceof Error ? contentsQuery.error.message : '获取内容失败');
+  }, [contentsQuery.error]);
 
   const resetContentLimit = useCallback(() => {
     setContentLimit(INITIAL_CONTENT_LIMIT);
   }, []);
 
-  const handleLoadMore = useCallback(async () => {
-    setLoadingMore(true);
-    try {
-      const nextLimit = contentLimit + CONTENT_LOAD_STEP;
-      const res = await contentsApi.list({
-        page_size: nextLimit,
-        hours: TIME_RANGE_HOURS[activeTimeRange],
-        source_type: activeSourceType === '全部' ? undefined : activeSourceType,
-        category: activeCategory === '全部' ? undefined : activeCategory,
-        q: searchQuery.trim() || undefined,
-        include_trend_sources: false,
-      });
-      setItems(res.items || []);
-      setTotalAvailable(res.total ?? (res.items || []).length);
-      setContentLimit(nextLimit);
-    } catch (err) {
-      console.error('Load more failed:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [contentLimit, activeTimeRange, activeSourceType, activeCategory, searchQuery]);
+  const handleLoadMore = useCallback(() => {
+    setContentLimit((limit) => limit + CONTENT_LOAD_STEP);
+  }, []);
 
   const handleIgnore = useCallback(async (id: number) => {
     if (!currentUser) {
@@ -174,12 +124,16 @@ export default function HomePage() {
     }
     try {
       await contentsApi.ignore(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      queryClient.setQueryData(queryKeys.contents.list(contentParams), (current: typeof contentsQuery.data) => current ? {
+        ...current,
+        items: current.items.filter((item) => item.id !== id),
+        total: Math.max(0, current.total - 1),
+      } : current);
       refreshCounts?.();
     } catch (err) {
       console.error('Ignore failed:', err);
     }
-  }, [currentUser, refreshCounts, router]);
+  }, [contentParams, contentsQuery.data, currentUser, queryClient, refreshCounts, router]);
 
   const tagOptions = useMemo(() => {
     const counts = new Map<string, number>();

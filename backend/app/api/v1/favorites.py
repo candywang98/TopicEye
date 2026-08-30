@@ -14,11 +14,15 @@ from app.repositories.favorite_repo import FavoriteRepo
 from app.schemas.favorite import (
     FavoriteBoardReorderRequest,
     FavoriteBulkDeleteRequest,
+    FavoriteBulkDeleteResponse,
     FavoriteBulkStatusRequest,
     FavoriteCreate,
+    FavoriteDeleteResponse,
+    FavoriteIndexResponse,
     FavoriteListResponse,
     FavoriteReorderRequest,
     FavoriteResponse,
+    FavoriteStateResponse,
     FavoriteUpdate,
 )
 from app.services.content_read_cache import invalidate_content_read_caches
@@ -141,7 +145,7 @@ async def list_favorites(
     )
 
 
-@router.get("/index")
+@router.get("/index", response_model=FavoriteIndexResponse)
 async def favorite_index(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -184,7 +188,7 @@ async def create_favorite(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@router.get("/state")
+@router.get("/state", response_model=FavoriteStateResponse)
 async def favorite_state(
     target_type: FavoriteTargetType,
     target_ids: str | None = Query(None, description="Comma-separated target IDs"),
@@ -260,7 +264,7 @@ async def bulk_update_favorite_status(
     return items
 
 
-@router.post("/bulk-delete")
+@router.post("/bulk-delete", response_model=FavoriteBulkDeleteResponse)
 async def bulk_delete_favorites(
     data: FavoriteBulkDeleteRequest,
     db: AsyncSession = Depends(get_db),
@@ -295,7 +299,7 @@ async def update_favorite(
     return item
 
 
-@router.delete("/{favorite_id}")
+@router.delete("/{favorite_id}", response_model=FavoriteDeleteResponse)
 async def delete_favorite(
     favorite_id: int,
     db: AsyncSession = Depends(get_db),

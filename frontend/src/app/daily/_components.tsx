@@ -27,6 +27,7 @@ import {
   pickKey,
   isEnglishTitle,
   displaySourceTitle,
+  dailyPickTopicHref,
 } from './_daily-utils';
 
 // ── PickCard (feature tier) ──────────────────────────────────────────
@@ -58,6 +59,7 @@ export function PickCard({
 }: PickCardProps) {
   const lc = pick.lifecycle ? LIFECYCLE_META[pick.lifecycle] || LIFECYCLE_META['上升期'] : null;
   const key = pickKey(pick);
+  const topicHref = dailyPickTopicHref(pick);
 
   return (
     <div
@@ -204,12 +206,14 @@ export function PickCard({
 
           {/* 操作按钮 */}
           <div className="flex items-center gap-2">
-            <a
-              href={`/plan?title=${encodeURIComponent(displaySourceTitle(pick, false))}${pick.source_url ? `&url=${encodeURIComponent(pick.source_url)}` : ''}`}
-              className="flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-xs font-bold text-white hover:opacity-90"
-            >
-              <FileText size={13} /> 写这个
-            </a>
+            {topicHref && (
+              <a
+                href={topicHref}
+                className="flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-xs font-bold text-white hover:opacity-90"
+              >
+                <FileText size={13} /> 写这个
+              </a>
+            )}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onMark(key, 'write', pick.category, pick.source_url); }}
@@ -292,6 +296,7 @@ export function BriefPickRow({
   onOpenReader,
 }: BriefPickRowProps) {
   const key = pickKey(pick);
+  const topicHref = dailyPickTopicHref(pick);
 
   return (
     <div>
@@ -359,12 +364,14 @@ export function BriefPickRow({
       </div>
       {isExpanded && (
         <div className="flex items-center gap-2 border-t border-gray-100 px-3 py-2 sm:px-4">
-          <a
-            href={`/plan?title=${encodeURIComponent(displaySourceTitle(pick, false))}${pick.source_url ? `&url=${encodeURIComponent(pick.source_url)}` : ''}`}
-            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
-          >
-            <FileText size={12} /> 写这个
-          </a>
+          {topicHref && (
+            <a
+              href={topicHref}
+              className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
+            >
+              <FileText size={12} /> 写这个
+            </a>
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onMark(key, 'write', pick.category, pick.source_url); }}

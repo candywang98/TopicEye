@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
@@ -22,7 +22,12 @@ from app.core.database import get_db
 from app.models.mother_topic import MotherTopic
 from app.models.user import User, UserRole
 from app.repositories.content_repo import ContentRepo
+from app.repositories.ignored_repo import IgnoredRepo
 from app.repositories.mother_topic_repo import MotherTopicRepository
+from app.schemas._normalizers import StrList
+from app.schemas.content import ContentResponse
+from app.services.content_serialization import content_with_latest_analysis
+from app.services.mother_topic_candidates import score_text_for_topics
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mother-topics", tags=["母题"])
@@ -34,7 +39,7 @@ router = APIRouter(prefix="/mother-topics", tags=["母题"])
 class MotherTopicBase(BaseModel):
     name: str
     description: str | None = None
-    keywords: list[str] = []
+    keywords: StrList = Field(default_factory=list)
     weight: float = 1.0
     content_type: str | None = None
     target_reader: str | None = None
@@ -94,9 +99,74 @@ class ContentScoringRequest(BaseModel):
 
 class ContentScoringResult(BaseModel):
     title: str
-    topic_scores: list[dict]  # [{name, score, weight, final}]
+    topic_scores: list[MotherTopicScoringDetail]
     top_topic: str | None
     final_score: float
+
+
+class MotherTopicScoringDetail(BaseModel):
+    name: str
+    keyword_score: float
+    weight: float
+    freshness: float
+    final: float
+
+
+class MotherTopicForkResponse(BaseModel):
+    forked: int
+    skipped: int
+    message: str
+
+
+class MotherTopicDeleteResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+class MotherTopicMatchScoreResponse(BaseModel):
+    name: str
+    keyword_score: float
+    weight: float
+    final: float
+
+
+class MotherTopicMatchResponse(BaseModel):
+    content_id: int
+    title: str
+    top_topic: str | None = None
+    top_score: float
+    all_scores: list[MotherTopicMatchScoreResponse] = Field(default_factory=list)
+
+
+class MotherTopicCandidateKeyword(BaseModel):
+    keyword: str
+    weight: float
+
+
+class MotherTopicCandidateItem(BaseModel):
+    content: ContentResponse
+    score: float
+    top_topic: str | None = None
+    topic_scores: list[MotherTopicScoringDetail] = Field(default_factory=list)
+    matched_keywords: list[MotherTopicCandidateKeyword] = Field(default_factory=list)
+    freshness: float = 0.0
+
+
+class MotherTopicCandidateStats(BaseModel):
+    topic_id: int
+    count: int
+    best_score: float
+
+
+class MotherTopicCandidatesResponse(BaseModel):
+    items: list[MotherTopicCandidateItem]
+    total: int
+    page: int
+    page_size: int
+    topic_stats: list[MotherTopicCandidateStats] = Field(default_factory=list)
+    main_count: int = 0
+    reserve_count: int = 0
+    average_score: float = 0.0
 
 
 # ── helpers ───────────────────────────────────────────────────────────
@@ -150,6 +220,107 @@ async def list_mother_topics(
     return [MotherTopicOut.from_orm_model(t) for t in topics]
 
 
+@router.get("/candidates", response_model=MotherTopicCandidatesResponse)
+async def list_mother_topic_candidates(
+    topic_id: int | None = None,
+    min_score: float = Query(0, ge=0, le=100),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a small, server-scored candidate page instead of 200 raw rows.
+
+    Visibility and ignored-content filtering reuse the same repository paths as
+    the contents list. Scoring intentionally matches ``/score-batch``.
+    """
+    topics = await _load_visible_topics(db, current_user.id, active_only=True)
+    if topic_id is not None and not any(topic.id == topic_id for topic in topics):
+        raise HTTPException(status_code=404, detail="母题不存在")
+    if not topics:
+        return MotherTopicCandidatesResponse(items=[], total=0, page=page, page_size=page_size)
+
+    ignored_ids = set(await IgnoredRepo(db).list_ignored_ids())
+    contents, _ = await ContentRepo(db).list_paginated_with_analyses(
+        page=1,
+        page_size=500,
+        sort_by="created_at",
+        sort_order="desc",
+        exclude_ids=ignored_ids,
+        exclude_source_types={"DouyinHot"},
+        visible_user_id=current_user.id,
+    )
+
+    scored_items: list[tuple[float, dict]] = []
+    topic_counts = {topic.id: 0 for topic in topics}
+    topic_best = {topic.id: 0.0 for topic in topics}
+    all_top_scores: list[float] = []
+    for content in contents:
+        scores = score_text_for_topics(
+            title=content.title,
+            summary=content.summary,
+            hot_value=0,
+            topics=list(topics),
+        )
+        selected = next((score for score in scores if score.topic_id == topic_id), None) if topic_id else None
+        ranking_score = selected.final if selected else (scores[0].final if scores else 0.0)
+        if scores and scores[0].final > 0:
+            all_top_scores.append(scores[0].final)
+        for score in scores:
+            if score.final > 0:
+                topic_counts[score.topic_id] += 1
+                topic_best[score.topic_id] = max(topic_best[score.topic_id], score.final)
+        if ranking_score <= 0 or ranking_score < min_score:
+            continue
+        display_scores = scores if topic_id is None else [score for score in scores if score.topic_id == topic_id]
+        matched_keywords = [
+            {"keyword": keyword, "weight": score.weight}
+            for score in display_scores
+            for keyword in score.matched_keywords
+        ]
+        serialized = content_with_latest_analysis(content, include_raw_content=False)
+        scored_items.append(
+            (
+                ranking_score,
+                {
+                    "content": serialized,
+                    "score": ranking_score,
+                    "top_topic": scores[0].name if scores else None,
+                    "topic_scores": [
+                        {
+                            "name": score.name,
+                            "keyword_score": score.keyword_score,
+                            "weight": score.weight,
+                            "freshness": score.freshness,
+                            "final": score.final,
+                        }
+                        for score in scores
+                    ],
+                    "matched_keywords": matched_keywords,
+                    "freshness": display_scores[0].freshness if display_scores else 0.0,
+                },
+            )
+        )
+
+    scored_items.sort(key=lambda pair: pair[0], reverse=True)
+    total = len(scored_items)
+    offset = (page - 1) * page_size
+    items = [payload for _, payload in scored_items[offset : offset + page_size]]
+    return MotherTopicCandidatesResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        topic_stats=[
+            {"topic_id": topic.id, "count": topic_counts[topic.id], "best_score": topic_best[topic.id]}
+            for topic in topics
+        ],
+        main_count=sum(1 for score in all_top_scores if score >= 80),
+        reserve_count=sum(1 for score in all_top_scores if 65 <= score < 80),
+        average_score=round(sum(all_top_scores) / len(all_top_scores), 1) if all_top_scores else 0.0,
+    )
+
+
 @router.post("", response_model=MotherTopicOut, include_in_schema=False)
 @router.post("/", response_model=MotherTopicOut)
 async def create_mother_topic(
@@ -188,7 +359,7 @@ async def create_mother_topic(
     return MotherTopicOut.from_orm_model(topic)
 
 
-@router.post("/fork-defaults")
+@router.post("/fork-defaults", response_model=MotherTopicForkResponse)
 async def fork_default_templates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -280,7 +451,7 @@ async def update_mother_topic(
     return MotherTopicOut.from_orm_model(topic)
 
 
-@router.delete("/{topic_id}")
+@router.delete("/{topic_id}", response_model=MotherTopicDeleteResponse)
 async def delete_mother_topic(
     topic_id: int,
     db: AsyncSession = Depends(get_db),
@@ -427,7 +598,7 @@ async def score_content_batch(
     return BatchScoringResult(results=results)
 
 
-@router.get("/match/{content_id}")
+@router.get("/match/{content_id}", response_model=MotherTopicMatchResponse)
 async def match_content_to_topics(
     content_id: int,
     db: AsyncSession = Depends(get_db),

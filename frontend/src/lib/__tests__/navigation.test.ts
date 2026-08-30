@@ -112,6 +112,12 @@ describe('visibleNavSpaces', () => {
   });
 });
 
+describe('导航内容', () => {
+  it('不再展示权益规划入口', () => {
+    expect(allItems.some((item) => item.href === '/plans')).toBe(false);
+  });
+});
+
 describe('派生路径集合', () => {
   it('ADMIN_ONLY_PATHS / USER_ONLY_PATHS 覆盖关键路径', () => {
     expect(ADMIN_ONLY_PATHS).toContain('/admin/contents');

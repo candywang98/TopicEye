@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { DM_Sans, DM_Mono, Noto_Serif_SC } from 'next/font/google';
+import { headers } from 'next/headers';
 import './globals.css';
 import ClientLayout from '@/components/ClientLayout';
 import SkipToContent from '@/components/SkipToContent';
-import { prefetchInitialData } from '@/lib/server-prefetch';
+import { prefetchInitialData, type PrefetchData } from '@/lib/server-prefetch';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -33,19 +34,33 @@ export const metadata: Metadata = {
   description: 'AI 驱动的创作者选题推荐平台，帮你发现下一个爆款选题',
 };
 
+const CLIENT_NAV_FALLBACK: PrefetchData = {
+  user: null,
+  userResolved: false,
+  featureFlags: {},
+  featureFlagsResolved: false,
+  counts: null,
+  localMode: false,
+  localModeResolved: false,
+};
+
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // SSR 预取首屏数据（auth/me + feature-flags + 侧边栏计数），
-  // 消除客户端 useEffect 串行拉取导致的白屏。
-  // 后端不可达时返回 null，客户端 Provider 会 fallback 到 useEffect。
-  const initialData = await prefetchInitialData();
+  const requestHeaders = await headers();
+  const isClientNavigation = requestHeaders.get('rsc') === '1';
+
+  // 仅文档首屏需要 SSR 预取。软导航时根 Provider 已挂载，重复请求 auth/me、
+  // feature flags 与三个计数既不会重新初始化 store，还会阻塞页面切换。
+  const initialData = isClientNavigation
+    ? CLIENT_NAV_FALLBACK
+    : await prefetchInitialData();
 
   return (
     <html lang="zh-CN" className={`${dmSans.variable} ${dmMono.variable} ${notoSerif.variable}`} suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <SkipToContent />
         <ClientLayout initialData={initialData}>{children}</ClientLayout>
       </body>

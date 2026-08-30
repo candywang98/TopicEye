@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
@@ -7,10 +9,16 @@ DEFAULT_LOCAL_SECRET_KEY = "topiceye-local-dev-secret-change-me"
 class Settings(BaseSettings):
     # ── Runtime ──
     APP_ENV: str = "development"
+    # 本地单人工作区：无需账号会话，所有请求映射到持久化的本地管理员。
+    # 仅允许 development/local/test 环境显式开启；生产部署必须保持关闭。
+    LOCAL_NO_LOGIN_ENABLED: bool = False
 
     # ── Database ──
     # 留空则启动时报错；本地开发请在 .env 中设置（参考 .env.example）。
     DATABASE_URL: str = ""
+    # PostgreSQL is the lightweight default. DuckDB remains an explicit,
+    # reversible compatibility path while parity tests are retained.
+    ANALYTICS_ENGINE: Literal["postgres", "duckdb"] = "postgres"
     # DuckDB connects in-memory and ATTACHes the configured OLTP database
     # READ_ONLY. PostgreSQL is the supported DuckDB source.
     DUCKDB_THREADS: int = 2
@@ -18,7 +26,7 @@ class Settings(BaseSettings):
     DUCKDB_EXTENSION_DIR: str = "./data/duckdb_extensions"
     # PostgreSQL 的 DuckDB ATTACH 在大数据量下可能执行长时间 COPY；生产部署可
     # 跳过启动期预热，优先保证 API 先可用（对应查询已有 SQLAlchemy 兜底）。
-    DUCKDB_STARTUP_INIT_ENABLED: bool = True
+    DUCKDB_STARTUP_INIT_ENABLED: bool = False
 
     # ── Connection pool ──
     # SQLAlchemy async engine 连接池参数。
@@ -207,7 +215,7 @@ class Settings(BaseSettings):
     @classmethod
     def _validate_database_url(cls, v: str) -> str:
         if not v or not v.strip():
-            raise ValueError("DATABASE_URL 未设置。请在 .env 中配置 PostgreSQL 连接字符串，" "参考 .env.example。")
+            raise ValueError("DATABASE_URL 未设置。请在 .env 中配置 PostgreSQL 连接字符串，参考 .env.example。")
         return v
 
     @field_validator("OAUTH_FRONTEND_REDIRECT_URL")
@@ -216,12 +224,16 @@ class Settings(BaseSettings):
         # 允许空字符串（OAuth 未启用时不强制要求）；
         # 但如果填了值，必须是合法的 http(s) URL。
         if v and not v.startswith(("http://", "https://")):
-            raise ValueError(f"OAUTH_FRONTEND_REDIRECT_URL 必须是 http:// 或 https:// 开头的 URL，" f"当前值: {v!r}")
+            raise ValueError(f"OAUTH_FRONTEND_REDIRECT_URL 必须是 http:// 或 https:// 开头的 URL，当前值: {v!r}")
         return v
 
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.strip().lower() in {"prod", "production"}
+
+    @property
+    def local_no_login_environment_allowed(self) -> bool:
+        return self.APP_ENV.strip().lower() in {"dev", "development", "local", "test", "testing"}
 
     @property
     def cors_origins(self) -> list[str]:

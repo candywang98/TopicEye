@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import { LEVEL_CONFIG } from '@/lib/design-tokens';
-import { useAppContext } from '@/components/ClientLayout';
+import { useFavoritesStore } from '@/providers/AppProvider';
 import { contentsApi, analysesApi } from '@/lib/api';
 import { Button, Panel } from '@/components/ui';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
@@ -21,7 +21,8 @@ import TopicCreationGenerator from '@/components/TopicCreationGenerator';
 export default function TopicDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { favoritePendingIds, toggleFavorite } = useAppContext();
+  const favoritePendingIds = useFavoritesStore((state) => state.favoritePendingIds);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
   const [item, setItem] = useState<ContentItem | null>(null);
   const [analysis, setAnalysis] = useState<ContentAnalysis | null>(null);

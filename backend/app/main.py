@@ -171,6 +171,12 @@ def ensure_runtime_secret_safety() -> None:
         raise RuntimeError("APP_ENV=production requires INTEGRATION_SECRET_KEY or a custom APP_SECRET_KEY")
 
 
+def ensure_local_no_login_safety() -> None:
+    """Refuse passwordless admin mode outside explicitly local environments."""
+    if settings.LOCAL_NO_LOGIN_ENABLED and not settings.local_no_login_environment_allowed:
+        raise RuntimeError("LOCAL_NO_LOGIN_ENABLED is only allowed when APP_ENV is development, local, or test")
+
+
 def ensure_admin_seed_safety() -> None:
     """Fail fast when the admin seed password is a known leaked/placeholder value.
 
@@ -232,6 +238,7 @@ async def lifespan(app: FastAPI):
     global _cache_warmup_task
 
     ensure_runtime_secret_safety()
+    ensure_local_no_login_safety()
     ensure_admin_seed_safety()
 
     # Startup: bring the database to the latest Alembic revision. Legacy
@@ -263,6 +270,14 @@ async def lifespan(app: FastAPI):
         logger.warning("Slow query listener setup failed (non-fatal): %s", exc)
 
     # ── Seed steps (idempotent; failures downgrade to warning, never block startup) ──
+    if settings.LOCAL_NO_LOGIN_ENABLED:
+        from app.services.local_workspace_service import ensure_local_workspace
+
+        async with async_session() as local_db:
+            local_user = await ensure_local_workspace(local_db)
+            await local_db.commit()
+            logger.info("Local no-login workspace ready: user_id=%d", local_user.id)
+
     admin_email = (settings.ADMIN_EMAIL or "").strip()
     admin_password = settings.ADMIN_PASSWORD or ""
     admin_enabled = bool(settings.ADMIN_SEED_ENABLED and admin_email and admin_password)
@@ -346,7 +361,7 @@ async def lifespan(app: FastAPI):
     # 即使 DuckDB 真的挂了,30s 后也会放弃,scheduler 仍能起来,_rescan_sources
     # 10 分钟一次的自愈也能跑。today_picks 在 DuckDB 不可用时走 commit 1a69db9
     # 加的 OLTP fallback 兜底。
-    if settings.DUCKDB_STARTUP_INIT_ENABLED:
+    if settings.ANALYTICS_ENGINE == "duckdb" and settings.DUCKDB_STARTUP_INIT_ENABLED:
         available = await _init_duckdb_layer()
         if available:
             logger.info(
@@ -356,7 +371,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("DuckDB analytical layer not available — falling back to SQLAlchemy queries")
     else:
-        logger.info("DuckDB startup initialization skipped — SQLAlchemy fallback remains available")
+        logger.info("Analytics engine=%s; DuckDB startup initialization skipped", settings.ANALYTICS_ENGINE)
 
     # Start the periodic scheduler
     if settings.SCHEDULER_ENABLED:
@@ -402,12 +417,13 @@ async def lifespan(app: FastAPI):
         logger.warning("Interest vector task drain failed", exc_info=True)
 
     # Close DuckDB analytics connection
-    try:
-        from app.services.duckdb_service import close_analytics
+    if settings.ANALYTICS_ENGINE == "duckdb":
+        try:
+            from app.services.duckdb_service import close_analytics
 
-        close_analytics()
-    except Exception:
-        logger.warning("DuckDB analytics shutdown failed", exc_info=True)
+            close_analytics()
+        except Exception:
+            logger.warning("DuckDB analytics shutdown failed", exc_info=True)
 
     await engine.dispose()
     logger.info("Application shutdown complete")
@@ -539,16 +555,19 @@ async def health_ready():
     用于"服务是否可以接收流量"的判断（部署/路由层）。
     """
     diagnostics = database_diagnostics(database_profile)
-    try:
-        from app.services.duckdb_service import get_analytics, run_query
+    if settings.ANALYTICS_ENGINE == "duckdb":
+        try:
+            from app.services.duckdb_service import get_analytics, run_query
 
-        duckdb_status = await run_query(get_analytics().status)
-    except Exception as exc:
-        duckdb_status = {
-            "status": "error",
-            "available": False,
-            "error": redact_database_secrets(str(exc), database_profile),
-        }
+            analytics_status = await run_query(get_analytics().status)
+        except Exception as exc:
+            analytics_status = {
+                "status": "error",
+                "available": False,
+                "error": redact_database_secrets(str(exc), database_profile),
+            }
+    else:
+        analytics_status = {"status": "ok", "available": True, "engine": "postgres"}
 
     # scheduler 是否在跑
     try:
@@ -568,7 +587,8 @@ async def health_ready():
         "database": {
             "backend": database_profile.backend,
             **diagnostics,
-            "duckdb": duckdb_status,
+            "analytics": analytics_status,
+            "duckdb": analytics_status if settings.ANALYTICS_ENGINE == "duckdb" else {"status": "disabled", "available": False},
         },
         "scheduler": {"running": scheduler_running},
     }

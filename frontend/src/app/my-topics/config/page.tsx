@@ -17,7 +17,7 @@ import { Badge, Button, Panel, Toolbar, cx } from '@/components/ui';
 import { FieldLabel } from '@/components/form';
 import { ErrorState, LoadingState } from '@/components/StateView';
 import { useFetch } from '@/hooks/useFetch';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 
 /* ── helpers ── */
 
@@ -376,7 +376,7 @@ function NewTopicForm({ onCreate }: { onCreate: (data: Partial<MotherTopic>) => 
 
 export default function MyTopicsConfigPage() {
   const router = useRouter();
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const isAdmin = currentUser?.role === 'admin';
 
   const { data, loading, error, refetch } = useFetch<{

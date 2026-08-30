@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LogIn,
   LogOut,
+  LoaderCircle,
   Radar,
   UserRound,
 } from 'lucide-react';
@@ -21,6 +23,7 @@ interface SidebarProps {
   currentUser?: AuthUser | null;
   authLoading?: boolean;
   enabledFeatures?: Record<string, boolean>;
+  localMode?: boolean;
   onLogout?: () => void;
 }
 
@@ -33,10 +36,21 @@ export default function Sidebar({
   currentUser = null,
   authLoading = false,
   enabledFeatures,
+  localMode = false,
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [navigation, setNavigation] = React.useState<{ href: string; fromPath: string } | null>(null);
+  const [, startNavigation] = React.useTransition();
+
+  const pendingHref = navigation?.fromPath === pathname ? navigation.href : null;
+
+  React.useEffect(() => {
+    if (!pendingHref) return;
+    const timeout = window.setTimeout(() => setNavigation(null), 30_000);
+    return () => window.clearTimeout(timeout);
+  }, [pendingHref]);
 
   const navSpaces = visibleNavSpaces(currentUser, enabledFeatures);
   const counts = {
@@ -91,22 +105,39 @@ export default function Sidebar({
               const active = isActive(item.href);
               const Icon = item.icon;
               const count = item.countKey ? counts[item.countKey] : 0;
+              const pending = pendingHref === item.href;
               return (
-                <button
+                <Link
                   key={item.id}
-                  type="button"
+                  href={item.href}
+                  prefetch
                   title={compact ? item.label : undefined}
                   aria-label={compact ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
-                  onClick={() => router.push(item.href)}
+                  aria-busy={pending || undefined}
+                  aria-disabled={Boolean(pendingHref) && !pending ? true : undefined}
+                  onClick={(event) => {
+                    if (active || pendingHref) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.preventDefault();
+                    setNavigation({ href: item.href, fromPath: pathname });
+                    startNavigation(() => router.push(item.href));
+                  }}
                   className={cx(
                     'mb-0.5 flex w-full items-center rounded-sm border-0 text-sm transition',
                     compact ? 'justify-center px-0 py-2.5' : 'justify-between px-3 py-2.5 text-left',
                     active ? 'bg-primary-light font-semibold text-primary-text' : 'bg-transparent font-normal text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                    pendingHref && !pending ? 'cursor-wait opacity-60' : '',
                   )}
                 >
                   <span className="flex items-center gap-2">
-                    <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+                    {pending ? (
+                      <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
+                    )}
                     {!compact && <span>{item.label}</span>}
                   </span>
                   {!compact && count > 0 ? (
@@ -114,7 +145,7 @@ export default function Sidebar({
                       {count}
                     </span>
                   ) : null}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -123,7 +154,19 @@ export default function Sidebar({
 
       {/* Bottom User Area */}
       <div className={cx('border-t border-gray-100 pb-4 pt-3', compact ? 'px-2.5' : 'px-3')}>
-        {currentUser ? (
+        {localMode ? (
+          <div className={cx('flex items-center gap-2', compact ? 'justify-center p-0' : 'px-3')}>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal to-[#7DD3C0] text-white" title="本地工作区">
+              <UserRound size={14} strokeWidth={2} />
+            </div>
+            {!compact && (
+              <div className="min-w-0">
+                <div className="truncate text-xs font-medium text-gray-700">{currentUser?.display_name || currentUser?.email || '本地用户'}</div>
+                <div className="text-[10px] font-bold text-teal">本地工作区</div>
+              </div>
+            )}
+          </div>
+        ) : currentUser ? (
           <div className={cx('flex items-center gap-2', compact ? 'justify-center p-0' : 'justify-between px-3')}>
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -172,7 +215,7 @@ export default function Sidebar({
             {!compact && <span>{authLoading ? '检查登录' : '登录'}</span>}
           </button>
         )}
-        {currentUser && !compact && (
+        {currentUser && !localMode && !compact && (
           <button
             type="button"
             onClick={() => router.push('/profile')}

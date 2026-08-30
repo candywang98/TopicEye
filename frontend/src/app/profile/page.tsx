@@ -17,7 +17,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import { integrationsApi, apiTokensApi, authApi } from '@/lib/api';
 import type { ApiTokenItem } from '@/lib/api';
@@ -84,7 +84,9 @@ function SectionLabel({ icon: Icon, label }: { icon: typeof ShieldCheck; label: 
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { currentUser, authLoading, refreshCounts } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
+  const refreshCounts = useFavoritesStore((state) => state.refreshCounts);
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [loadingStatus, setLoadingStatus] = useState(true);

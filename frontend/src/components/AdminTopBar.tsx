@@ -3,7 +3,7 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 
 // 路径 → 页面名映射（面包屑用）
 const ADMIN_PAGE_LABELS: Record<string, string> = {
@@ -32,7 +32,7 @@ function findPageLabel(pathname: string): string {
 
 export default function AdminTopBar() {
   const pathname = usePathname();
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const pageLabel = findPageLabel(pathname);
 
   return (

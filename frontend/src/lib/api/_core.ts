@@ -25,6 +25,10 @@ export { BASE_URL };
 
 export const FAVORITE_STATE_BATCH_SIZE = 200;
 
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 // Cookie 名称（与后端 config.py 保持一致）
 const AUTH_PRESENCE_COOKIE = 'topiceye_auth_present';
 const AUTH_EXPIRES_COOKIE = 'topiceye_auth_expires_at';
@@ -203,6 +207,7 @@ export async function request<T>(
   try {
     response = await fetch(url, config);
   } catch (err) {
+    if (isAbortError(err)) throw err;
     // 网络层失败（后端不可达/重启中）：抛出带标记的错误，调用方可据此保留登录态
     const networkErr = new Error(
       err instanceof Error ? err.message : 'Network request failed'
@@ -227,6 +232,7 @@ export async function request<T>(
       try {
         response = await fetch(url, retryConfig);
       } catch (err) {
+        if (isAbortError(err)) throw err;
         const networkErr = new Error(
           err instanceof Error ? err.message : 'Network request failed'
         ) as Error & { isNetworkError?: boolean };

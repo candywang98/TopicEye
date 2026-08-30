@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, JsonValue, field_validator, model_validator
 
 from app.models.favorite import FavoriteStatus, FavoriteTargetType
+from app.schemas._normalizers import StrList
 
 
 def normalize_optional_text(value):
@@ -24,10 +24,10 @@ class FavoriteCreate(BaseModel):
     cover_url: str | None = Field(default=None, max_length=1024)
     source_name: str | None = Field(default=None, max_length=255)
     collection_id: int | None = None
-    tags: Any | None = None
+    tags: StrList = Field(default_factory=list)
     note: str | None = None
     status: FavoriteStatus = FavoriteStatus.INBOX
-    snapshot: Any | None = None
+    snapshot: dict[str, JsonValue] | None = None
 
     @model_validator(mode="after")
     def validate_target_identity(self) -> FavoriteCreate:
@@ -43,10 +43,10 @@ class FavoriteCreate(BaseModel):
 
 class FavoriteUpdate(BaseModel):
     collection_id: int | None = None
-    tags: Any | None = None
+    tags: StrList | None = None
     note: str | None = None
     status: FavoriteStatus | None = None
-    snapshot: dict[str, Any] | None = None
+    snapshot: dict[str, JsonValue] | None = None
 
     @field_validator("note", mode="before")
     @classmethod
@@ -127,11 +127,11 @@ class FavoriteResponse(BaseModel):
     cover_url: str | None = None
     source_name: str | None = None
     collection_id: int | None = None
-    tags: Any | None = None
+    tags: StrList = Field(default_factory=list)
     note: str | None = None
     status: str
     position: int
-    snapshot: Any | None = None
+    snapshot: dict[str, JsonValue] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -143,3 +143,33 @@ class FavoriteListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class FavoriteIndexItemResponse(BaseModel):
+    id: int
+    target_type: str
+    target_key: str
+    target_id: int | None = None
+
+
+class FavoriteIndexResponse(BaseModel):
+    items: list[FavoriteIndexItemResponse]
+    total: int
+
+
+class FavoriteTargetStateResponse(BaseModel):
+    target_key: str
+    is_favorited: bool
+    favorite_id: int | None = None
+
+
+class FavoriteStateResponse(BaseModel):
+    items: list[FavoriteTargetStateResponse]
+
+
+class FavoriteBulkDeleteResponse(BaseModel):
+    deleted: int
+
+
+class FavoriteDeleteResponse(BaseModel):
+    deleted: bool

@@ -202,16 +202,85 @@ async def test_response_cache_isolated_by_routing_group_and_scene(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_call_llm_requires_enabled_db_route_models(monkeypatch):
-    provider._failover.reset()
-
-    async def route_models(group="default", user_id=None):
+async def test_call_llm_without_enabled_models_raises_explicit_error_without_opening_breaker(monkeypatch):
+    async def route_models(group="default"):
         return []
 
     monkeypatch.setattr(provider._model_cache, "get_route_models", route_models)
+    monkeypatch.setattr("app.services.llm.response_cache.get_llm_cache", LLMCache)
 
-    with pytest.raises(RuntimeError, match="No enabled LLM route models configured"):
-        await provider.call_llm([{"role": "user", "content": "hello"}])
+    for _ in range(6):
+        with pytest.raises(provider.LlmNotConfiguredError) as exc_info:
+            await provider.call_llm(
+                [{"role": "user", "content": "hello"}],
+                routing_group="analysis_lite",
+            )
+        assert exc_info.value.routing_group == "analysis_lite"
+
+    breaker = get_llm_circuit_breaker("analysis_lite")
+    assert breaker.state == CircuitState.CLOSED
+    assert breaker.status()["failure_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_half_open_cache_hit_records_success_and_releases_probe(monkeypatch):
+    breaker = get_llm_circuit_breaker("default")
+    for _ in range(breaker.failure_threshold):
+        await breaker.record_failure()
+    breaker._last_failure_time -= breaker.cooldown_seconds + 1
+
+    cache = LLMCache()
+    messages = [{"role": "user", "content": "cached probe"}]
+    cache.set(
+        messages,
+        0.3,
+        2000,
+        model=provider._cache_scope("default", "general"),
+        raw_response="cached result",
+    )
+
+    async def unexpected_inner(*_args, **_kwargs):
+        raise AssertionError("cache hit must not call a model")
+
+    monkeypatch.setattr("app.services.llm.response_cache.get_llm_cache", lambda: cache)
+    monkeypatch.setattr(provider, "_call_llm_with_metadata_inner", unexpected_inner)
+
+    result, metadata = await provider.call_llm_with_metadata(messages)
+
+    assert result == "cached result"
+    assert metadata == {"cache_hit": True}
+    assert breaker.state == CircuitState.CLOSED
+    assert breaker.status()["failure_count"] == 0
+    assert await breaker.allow_request() is True
+
+
+@pytest.mark.asyncio
+async def test_half_open_cancellation_releases_probe_without_resetting_breaker(monkeypatch):
+    breaker = get_llm_circuit_breaker("default")
+    for _ in range(breaker.failure_threshold):
+        await breaker.record_failure()
+    breaker._last_failure_time -= breaker.cooldown_seconds + 1
+
+    started = asyncio.Event()
+
+    async def cancelled_inner(*_args, **_kwargs):
+        started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("app.services.llm.response_cache.get_llm_cache", LLMCache)
+    monkeypatch.setattr(provider, "_call_llm_with_metadata_inner", cancelled_inner)
+
+    task = asyncio.create_task(provider.call_llm([{"role": "user", "content": "cancel probe"}]))
+    await started.wait()
+    assert breaker.state == CircuitState.HALF_OPEN
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert breaker.state == CircuitState.HALF_OPEN
+    assert breaker.status()["failure_count"] == breaker.failure_threshold
+    assert await breaker.allow_request() is True
 
 
 @pytest.mark.asyncio

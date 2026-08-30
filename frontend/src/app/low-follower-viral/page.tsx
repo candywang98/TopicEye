@@ -20,8 +20,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { viralApi } from '@/lib/api';
-import { useAppContext } from '@/components/ClientLayout';
+import { useFavoritesStore, useReaderStore } from '@/providers/AppProvider';
 import CategoryChip from '@/components/CategoryChip';
 import AnalysisPanel from '@/components/AnalysisPanel';
 import SourceBadge from '@/components/SourceBadge';
@@ -29,7 +28,7 @@ import ScoreBreakdownChart from '@/components/ScoreBreakdownChart';
 import { Pagination } from '@/components/Pagination';
 import { Badge, Button, Panel, PanelTitle, Toolbar, cx } from '@/components/ui';
 import { EmptyState, LoadingState } from '@/components/StateView';
-import { useFetch } from '@/hooks/useFetch';
+import { useLowFollowerViralQuery } from '@/hooks/queries/useContentQueries';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
 import { timeAgo, getTagColor } from '@/lib/utils';
 import { getRecommendationReason } from '@/lib/recommendation';
@@ -48,7 +47,7 @@ const CATEGORY_OPTIONS = ['AI', '职场', '商业', '教育', '自媒体', '科�
 type AnalysisWithMeta = ContentAnalysis & { _content_id?: number };
 
 export default function LowFollowerViralPage() {
-  const { toggleFavorite } = useAppContext();
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [hours, setHours] = useState<number>(48);
@@ -59,19 +58,12 @@ export default function LowFollowerViralPage() {
   // hours / category 切换时回到第 1 页
   React.useEffect(() => { setPage(1); }, [hours, category]);
 
-  type ListPayload = { items: ContentItem[]; total: number };
-  const { data, loading } = useFetch<ListPayload>(
-    async () => {
-      const res = await viralApi.list({
-        page,
-        hours,
-        category: category || undefined,
-        page_size: PAGE_SIZE,
-      });
-      return { items: res.items || [], total: res.total || 0 };
-    },
-    [page, hours, category],
-  );
+  const { data, isLoading: loading } = useLowFollowerViralQuery({
+    page,
+    hours,
+    category: category || undefined,
+    page_size: PAGE_SIZE,
+  });
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -420,7 +412,7 @@ function ActionRow({
   dark?: boolean;
 }) {
   const analysis = getAnalysis(item);
-  const { openReader } = useAppContext();
+  const openReader = useReaderStore((state) => state.openReader);
   const actionClass = dark
     ? 'border-white/15 bg-white/10 text-gray-200 hover:bg-white/15'
     : 'border-gray-200 bg-white text-gray-600 hover:border-primary-border hover:text-primary';

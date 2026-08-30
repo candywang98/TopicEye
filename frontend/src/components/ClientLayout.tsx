@@ -4,11 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import NotificationBell from '@/components/NotificationBell';
-import { AppProvider, useAuthContext, useFavoritesContext, useAppContext } from '@/providers/AppProvider';
+import { AppProvider, useAuthContext, useFavoritesContext } from '@/providers/AppProvider';
 import type { PrefetchData } from '@/lib/server-prefetch';
-
-// Backward compat: 38 个消费者从 @/components/ClientLayout 导入 useAppContext
-export { useAppContext };
 
 const CHROMELESS_PATHS = new Set(['/login']);
 const ADMIN_PATH_PREFIX = '/admin';
@@ -39,7 +36,7 @@ export default function ClientLayout({
 
 function LayoutChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { currentUser, authLoading, enabledFeatures, logout } = useAuthContext();
+  const { currentUser, authLoading, enabledFeatures, localMode, logout } = useAuthContext();
   const { topicCount, todayPicksCount, favoriteTotal, sourceCount } = useFavoritesContext();
   const [compactNav, setCompactNav] = useState(false);
 
@@ -81,6 +78,7 @@ function LayoutChrome({ children }: { children: React.ReactNode }) {
         currentUser={currentUser}
         authLoading={authLoading}
         enabledFeatures={enabledFeatures}
+        localMode={localMode}
         onLogout={logout}
       />
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page">

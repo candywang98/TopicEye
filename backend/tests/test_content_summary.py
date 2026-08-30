@@ -49,3 +49,24 @@ def test_content_response_normalizes_legacy_summary_without_changing_content_url
 
     assert payload["summary"] is None
     assert payload["url"] == "https://www.raymondyxu.com/blog/labelYourAIWritingAsAIWriting"
+
+
+def test_content_response_normalizes_legacy_tags_to_string_list():
+    created_at = datetime(2026, 8, 29, tzinfo=UTC)
+
+    def payload_for(tags):
+        return ContentResponse(
+            id=1,
+            title="Legacy tags",
+            url="https://example.com/legacy-tags",
+            crawled_at=created_at,
+            created_at=created_at,
+            updated_at=created_at,
+            status="analyzed",
+            tags=tags,
+        ).model_dump()
+
+    assert payload_for('["ai", "agent", "ai"]')["tags"] == ["ai", "agent"]
+    assert payload_for("ai, agent，product")["tags"] == ["ai", "agent", "product"]
+    assert payload_for("null")["tags"] == []
+    assert payload_for({"unexpected": "shape"})["tags"] == []

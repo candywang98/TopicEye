@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import { contentsApi } from '@/lib/api';
 import type { EvidenceMark } from '@/types';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore, useFavoritesStore, useReaderStore } from '@/providers/AppProvider';
 import AnalysisPanel from '@/components/AnalysisPanel';
 import RadarSignature from '@/components/RadarSignature';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import { EmptyState, LoadingState } from '@/components/StateView';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
-import { useFetch } from '@/hooks/useFetch';
+import { usePicksEvidenceQuery, useTodayPicksQuery } from '@/hooks/queries/useContentQueries';
 import { getRecommendLevelLabel } from '@/lib/utils';
 import { startContentWorkflow } from '@/lib/workflow';
 import type { ContentAnalysis, ContentItem, TopicInfo } from '@/types';
@@ -47,7 +47,10 @@ export default function TodayPicksPageWrapper() {
 function TodayPicksPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { toggleFavorite, currentUser, reportTodayPicksTotal, openReader } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const reportTodayPicksTotal = useFavoritesStore((state) => state.reportTodayPicksTotal);
+  const openReader = useReaderStore((state) => state.openReader);
 
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedContentType, setSelectedContentType] = useState(searchParams.get('content_type') || '');
@@ -99,17 +102,13 @@ function TodayPicksPage() {
     updateURL('', '', '', DEFAULT_TIME_RANGE);
   };
 
-  // 数据获取：从手写 useEffect+fetch 迁移到 useFetch（含竞态保护、enabled、refetch）。
-  const fetchPicks = useCallback(() => {
-    const params: { category?: string; content_type?: string; time_range?: string; limit?: number } = {};
-    if (selectedCategory) params.category = selectedCategory;
-    if (selectedContentType) params.content_type = selectedContentType;
-    params.time_range = selectedTimeRange;
-    params.limit = selectedTimeRange === '7d' ? Math.max(loadLimit, 80) : loadLimit;
-    return contentsApi.todayPicks(params);
-  }, [loadLimit, selectedCategory, selectedContentType, selectedTimeRange]);
-
-  const { data, loading } = useFetch(fetchPicks, [loadLimit, selectedCategory, selectedContentType, selectedTimeRange]);
+  const picksParams = useMemo(() => ({
+    category: selectedCategory || undefined,
+    content_type: selectedContentType || undefined,
+    time_range: selectedTimeRange,
+    limit: selectedTimeRange === '7d' ? Math.max(loadLimit, 80) : loadLimit,
+  }), [loadLimit, selectedCategory, selectedContentType, selectedTimeRange]);
+  const { data, isLoading: loading } = useTodayPicksQuery(picksParams);
 
   // 从 data 派生各状态
   const items = data?.items || [];
@@ -118,15 +117,9 @@ function TodayPicksPage() {
   const eventMemberCount = data?.event_members_hidden || 0;
 
   // 批量获取证据标记（避免每张卡片单独 API 调用 N+1）
-  const [evidenceMarks, setEvidenceMarks] = useState<Record<string, EvidenceMark>>({});
-  useEffect(() => {
-    if (items.length === 0) return;
-    let cancelled = false;
-    contentsApi.getEvidenceBatch(items.map((i) => i.id)).then((res) => {
-      if (!cancelled) setEvidenceMarks(res.marks || {});
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [items]);
+  const evidenceIds = useMemo(() => items.map((item) => item.id), [items]);
+  const { data: evidenceData } = usePicksEvidenceQuery(evidenceIds);
+  const evidenceMarks: Record<string, EvidenceMark> = evidenceData?.marks || {};
 
   // 副作用：上报当日精选总数到全局 context（原在 fetchPicks 内同步调用）。
   useEffect(() => { reportTodayPicksTotal(total); }, [reportTodayPicksTotal, total]);

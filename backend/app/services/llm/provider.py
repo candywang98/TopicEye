@@ -20,12 +20,10 @@ app.services.llm import call_llm / call_llm_json。
 
 from __future__ import annotations
 
-import asyncio  # noqa: F401  (kept for callers importing provider-level helpers)
+import asyncio
 import json
 import logging
 from typing import Any
-
-from litellm.exceptions import UnsupportedParamsError
 
 from app.services.llm._call_engine import (
     _call_with_retry,
@@ -110,6 +108,14 @@ class LlmCapacityUnavailableError(Exception):
         )
 
 
+class LlmNotConfiguredError(Exception):
+    """No enabled model exists for the requested routing group."""
+
+    def __init__(self, *, routing_group: str):
+        self.routing_group = routing_group
+        super().__init__(f"路由组 {routing_group!r} 尚未配置可用模型，请到管理后台「AI 引擎」配置并启用模型。")
+
+
 async def call_llm_with_metadata(
     messages: list,
     temperature: float = 0.3,
@@ -126,7 +132,7 @@ async def call_llm_with_metadata(
     so JSON-mode callers still get a usable text response.
     """
     # Circuit breaker: skip LLM call entirely when in OPEN state
-    from app.services.llm.circuit_breaker import get_llm_circuit_breaker
+    from app.services.llm.circuit_breaker import CircuitState, get_llm_circuit_breaker
 
     breaker = get_llm_circuit_breaker(routing_group)
     if not await breaker.allow_request():
@@ -137,16 +143,20 @@ async def call_llm_with_metadata(
             f"LLM circuit breaker OPEN (failures={breaker.status()['failure_count']}); callers should use fallback"
         )
 
-    # Response cache: same (messages, temperature, model) → return cached raw
-    from app.services.llm.response_cache import get_llm_cache
-
-    cache = get_llm_cache()
-    cache_scope = _cache_scope(routing_group, scene)
-    cached = cache.get(messages, temperature, max_tokens, model=cache_scope)
-    if cached is not None:
-        return cached, {"cache_hit": True}
-
     try:
+        # Response cache: same (messages, temperature, model) → return cached raw
+        from app.services.llm.response_cache import get_llm_cache
+
+        cache = get_llm_cache()
+        cache_scope = _cache_scope(routing_group, scene)
+        cached = cache.get(messages, temperature, max_tokens, model=cache_scope)
+        if cached is not None:
+            # A HALF_OPEN request owns the sole probe slot even when it can be
+            # answered locally. Resolve it so later requests are not blocked.
+            if breaker.state == CircuitState.HALF_OPEN:
+                await breaker.record_success()
+            return cached, {"cache_hit": True}
+
         result = await _call_llm_with_metadata_inner(
             messages,
             temperature,
@@ -164,18 +174,26 @@ async def call_llm_with_metadata(
             raw_response=result[0],
         )
         return result
+    except asyncio.CancelledError:
+        # Caller cancellation says nothing about route health. In HALF_OPEN it
+        # must still release the probe so another request can test the route.
+        await breaker.release_probe()
+        raise
     except Exception as exc:
         # 输入或内容策略错误不反映模型可用性，不能污染全局熔断器。
         from app.services.llm.circuit_breaker import CircuitOpenError
 
         # 429 和本地候选冷却代表局部容量耗尽，由 per-model failover 管理；
         # 把它们累计到路由熔断器会让一个配额不足的渠道阻断全部调用。
-        if (
-            not isinstance(exc, CircuitOpenError | LlmCapacityUnavailableError)
+        should_record_failure = (
+            not isinstance(exc, CircuitOpenError | LlmCapacityUnavailableError | LlmNotConfiguredError)
             and not _is_deterministic_request_error(exc)
             and not _is_rate_limit_error(exc)
-        ):
+        )
+        if should_record_failure:
             await breaker.record_failure()
+        else:
+            await breaker.release_probe()
         raise
 
 
@@ -188,6 +206,8 @@ async def _call_llm_with_metadata_inner(
     response_format: dict | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Call LLM with automatic ordered failover and return the selected route metadata."""
+    from litellm.exceptions import UnsupportedParamsError
+
     db_models = await _model_cache.get_route_models(routing_group)
     candidates = [_candidate_from_db_model(m, temperature, max_tokens) for m in db_models]
 
@@ -284,7 +304,7 @@ async def _call_llm_with_metadata_inner(
             routing_group=routing_group,
             next_available_at=next_available_at,
         )
-    raise RuntimeError("No enabled LLM route models configured")
+    raise LlmNotConfiguredError(routing_group=routing_group)
 
 
 def _llm_call_metadata(

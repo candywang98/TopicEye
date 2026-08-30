@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Check, Gem, LockKeyhole, ShieldCheck, Sparkles, UserRound } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { plansApi } from '@/lib/api';
 import { Badge, Panel, cx } from '@/components/ui';
 import { ErrorState, LoadingState } from '@/components/StateView';
@@ -26,7 +27,15 @@ function formatLimit(value: unknown): string {
 }
 
 export default function PlansPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const router = useRouter();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
+  const localMode = useAuthStore((state) => state.localMode);
+  const localModeLoading = useAuthStore((state) => state.localModeLoading);
+
+  useEffect(() => {
+    if (!localModeLoading && localMode) router.replace('/');
+  }, [localMode, localModeLoading, router]);
   const { data: catalog, loading, error, refetch } = useFetch<PlanCatalogResponse>(
     async () => {
       try {
@@ -36,7 +45,7 @@ export default function PlansPage() {
       }
     },
     [currentUser?.plan],
-    { enabled: !authLoading },
+    { enabled: !authLoading && !localModeLoading && !localMode },
   );
 
   const recommended = useMemo(() => catalog?.tiers.find((tier) => tier.recommended), [catalog]);

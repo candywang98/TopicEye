@@ -4,6 +4,8 @@ import { T } from '@/lib/design-tokens';
 import {
   weightStars,
   extractRiskNotes,
+  normalizeStringList,
+  normalizeTagList,
   extractCreatorAngles,
   extractTags,
   extractTitleSuggestions,
@@ -44,9 +46,42 @@ describe('extractRiskNotes', () => {
       extractRiskNotes(analysis({ risk_notes: { k1: 'x', k2: ['y', 'z', ''], k3: 123 } })),
     ).toEqual(['x', 'y', 'z']);
   });
+
+  it('兼容 JSON 对象字符串并过滤空风险说明', () => {
+    expect(extractRiskNotes(analysis({ risk_notes: '{"notes":""}' }))).toEqual([]);
+    expect(extractRiskNotes(analysis({ risk_notes: '{"notes":"注意版权"}' }))).toEqual(['注意版权']);
+  });
 });
 
 describe('extract* helpers', () => {
+  it('normalizeStringList 兼容历史 JSON 字符串、标量和混合数组', () => {
+    expect(normalizeStringList([' a ', 'b', '', 123, 'a'])).toEqual(['a', 'b']);
+    expect(normalizeStringList('["观点 1", "观点 2"]')).toEqual(['观点 1', '观点 2']);
+    expect(normalizeStringList('单点观点')).toEqual(['单点观点']);
+    expect(normalizeStringList('"单点观点"')).toEqual(['单点观点']);
+    expect(normalizeStringList('')).toEqual([]);
+    expect(normalizeStringList(null)).toEqual([]);
+    expect(normalizeStringList({ points: ['观点'] })).toEqual([]);
+  });
+
+  it('normalizeTagList 兼容 JSON 数组和逗号分隔格式', () => {
+    expect(normalizeTagList('["ai", "agent"]')).toEqual(['ai', 'agent']);
+    expect(normalizeTagList('ai, agent, ai')).toEqual(['ai', 'agent']);
+    expect(normalizeTagList('null')).toEqual([]);
+  });
+
+  it('三个分析字段都通过历史格式兼容层', () => {
+    const legacy = analysis({
+      key_points: '["迁移风险", "回滚方案"]',
+      creator_angles: '从工程团队视角切入',
+      title_suggestions: '"AI 迁移为什么容易失败"',
+    });
+
+    expect(extractKeyPoints(legacy)).toEqual(['迁移风险', '回滚方案']);
+    expect(extractCreatorAngles(legacy)).toEqual(['从工程团队视角切入']);
+    expect(extractTitleSuggestions(legacy)).toEqual(['AI 迁移为什么容易失败']);
+  });
+
   it('extractCreatorAngles', () => {
     expect(extractCreatorAngles(analysis({ creator_angles: ['角度1', '角度2'] }))).toEqual(['角度1', '角度2']);
     expect(extractCreatorAngles(null)).toEqual([]);

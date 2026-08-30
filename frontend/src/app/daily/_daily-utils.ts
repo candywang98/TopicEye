@@ -178,6 +178,10 @@ export function displaySourceTitle(pick: { source_title?: string; source_title_z
   return pick.source_title_zh || pick.source_title || '';
 }
 
+export function dailyPickTopicHref(pick: Pick<DailyPick, 'content_id'>): string | null {
+  return pick.content_id ? `/topics/${pick.content_id}` : null;
+}
+
 export function marksMapFromResp(marks: Array<{ pick_title: string; action: string }>): Record<string, MarkAction> {
   const map: Record<string, MarkAction> = {};
   for (const m of marks) {

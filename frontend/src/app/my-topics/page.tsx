@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
   BookmarkCheck,
@@ -15,15 +16,16 @@ import {
   Star,
   Target,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useFavoritesStore, useReaderStore } from '@/providers/AppProvider';
 import SourceBadge from '@/components/SourceBadge';
 import { Badge, Button, Metric, Panel, Toolbar, cx } from '@/components/ui';
 import { LoadingState } from '@/components/StateView';
-import { useFetch } from '@/hooks/useFetch';
-import { motherTopicsApi, contentsApi, type MotherTopic, type ContentItem } from '@/lib/api';
+import { motherTopicsApi, type MotherTopic, type ContentItem } from '@/lib/api';
+import { useMotherTopicCandidatesQuery, useMotherTopicsQuery } from '@/hooks/queries/useMotherTopicQueries';
+import { queryKeys } from '@/lib/query-keys';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
 import { parseUTC } from '@/lib/datetime';
-import { useEffect, useRef } from 'react';
+import { normalizeTagList } from '@/lib/utils';
 
 interface TopicScore {
   name: string;
@@ -43,6 +45,9 @@ interface ScoredContent {
 }
 
 type ScoreTone = 'primary' | 'teal' | 'amber' | 'neutral';
+
+const EMPTY_TOPICS: MotherTopic[] = [];
+const EMPTY_SCORED_CONTENT: ScoredContent[] = [];
 
 const toneClass: Record<ScoreTone, { text: string; bg: string; border: string; bar: string; label: string }> = {
   primary: {
@@ -76,7 +81,7 @@ const toneClass: Record<ScoreTone, { text: string; bg: string; border: string; b
 };
 
 function normalizeScore(raw: number): number {
-  return Math.min(Math.round(raw * (100 / 1.1)), 100);
+  return Math.min(Math.max(Math.round(raw), 0), 100);
 }
 
 function getScoreTone(score: number): ScoreTone {
@@ -99,10 +104,6 @@ function matchedScores(item: ScoredContent) {
   return (item.scoring?.topic_scores || [])
     .filter((score) => score.final > 0)
     .sort((a, b) => b.final - a.final);
-}
-
-function scoreForTopic(item: ScoredContent, topicName: string) {
-  return item.scoring?.topic_scores.find((score) => score.name === topicName)?.final || 0;
 }
 
 function TopicNavItem({
@@ -161,6 +162,7 @@ function ContentCard({
   const matches = matchedScores(item);
   const topTopic = item.scoring?.top_topic;
   const summary = item.content.summary || item.content.raw_content || '';
+  const tags = normalizeTagList(item.content.tags);
 
   return (
     <Panel className="p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
@@ -213,7 +215,7 @@ function ContentCard({
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {item.content.category && <Badge tone="neutral" className="px-2 py-0.5">{item.content.category}</Badge>}
-          {(item.content.tags || []).slice(0, 3).map((tag) => (
+          {tags.slice(0, 3).map((tag) => (
             <span key={tag} className="text-[11px] text-gray-400">#{tag}</span>
           ))}
         </div>
@@ -255,40 +257,33 @@ function ContentCard({
   );
 }
 
-type TopicsPayload = { topics: MotherTopic[]; scored: ScoredContent[] };
-
 export default function MyTopicsPage() {
   const [selectedTopic, setSelectedTopic] = useState('');
   const [filterMinScore, setFilterMinScore] = useState(45);
-  const { toggleFavorite, openReader } = useAppContext();
+  const [queryMinScore, setQueryMinScore] = useState(45);
+  const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+  const openReader = useReaderStore((state) => state.openReader);
+  const topicsQuery = useMotherTopicsQuery(true);
+  const topics = topicsQuery.data ?? EMPTY_TOPICS;
+  const selectedTopicMeta = topics.find((topic) => topic.name === selectedTopic);
 
-  const { data, loading, refetch } = useFetch<TopicsPayload>(async () => {
-    const [topicList, contentPage] = await Promise.all([
-      motherTopicsApi.list(true),
-      contentsApi.list({ page: 1, page_size: 200, include_trend_sources: false }),
-    ]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQueryMinScore(filterMinScore);
+      setPage(1);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [filterMinScore]);
 
-    let scored: ScoredContent[];
-    try {
-      const { results } = await motherTopicsApi.scoreBatch(
-        (contentPage.items || []).map((content) => ({
-          title: content.title,
-          summary: content.summary || '',
-          hot_value: 0,
-        }))
-      );
-      const resultMap = new Map(results.map((result) => [result.title, result]));
-      scored = (contentPage.items || []).map((content) => ({
-        content,
-        scoring: resultMap.get(content.title) ?? null,
-      }));
-    } catch {
-      scored = (contentPage.items || []).map((content) => ({ content, scoring: null }));
-    }
-
-    scored.sort((a, b) => (b.scoring?.final_score || 0) - (a.scoring?.final_score || 0));
-    return { topics: topicList, scored };
-  }, []);
+  const candidatesQuery = useMotherTopicCandidatesQuery({
+    topic_id: selectedTopicMeta?.id,
+    min_score: queryMinScore,
+    page,
+    page_size: 20,
+  });
+  const loading = topicsQuery.isLoading || candidatesQuery.isLoading;
 
   // 首次进入时懒触发 fork：如果用户还没有自己的母题，fork 一份系统模板
   const forkTriggeredRef = useRef(false);
@@ -301,43 +296,45 @@ export default function MyTopicsPage() {
         const hasOwn = ts.some(t => t.owner_user_id !== null);
         if (!hasOwn) {
           await motherTopicsApi.forkDefaults();
-          refetch();
+          await queryClient.invalidateQueries({ queryKey: queryKeys.motherTopics.all });
         }
       } catch {
         // fork 失败不阻塞页面——用户仍能看到系统模板的打分结果
       }
     })();
-  }, [refetch]);
+  }, [queryClient]);
 
-  const topics = data?.topics ?? [];
-  const allScored = data?.scored ?? [];
+  const allScored = useMemo<ScoredContent[]>(() => (
+    candidatesQuery.data?.items.map((item) => ({
+      content: item.content,
+      scoring: {
+        final_score: item.score,
+        top_topic: item.top_topic,
+        topic_scores: item.topic_scores,
+      },
+    })) ?? EMPTY_SCORED_CONTENT
+  ), [candidatesQuery.data?.items]);
 
   const matchedItems = useMemo(() => (
     allScored.filter((item) => (item.scoring?.final_score || 0) > 0)
   ), [allScored]);
 
-  const filtered = useMemo(() => matchedItems.filter((item) => {
-    const topicScore = selectedTopic ? scoreForTopic(item, selectedTopic) : item.scoring?.final_score || 0;
-    if (normalizeScore(topicScore) < filterMinScore) return false;
-    if (!selectedTopic) return true;
-    return topicScore > 0;
-  }), [matchedItems, selectedTopic, filterMinScore]);
+  const filtered = matchedItems;
 
-  const topicStats = useMemo(() => topics.map((topic) => {
-    const related = matchedItems.filter((item) => scoreForTopic(item, topic.name) > 0);
-    const best = related.reduce((max, item) => Math.max(max, normalizeScore(scoreForTopic(item, topic.name))), 0);
-    return { topic, count: related.length, best };
-  }), [topics, matchedItems]);
+  const topicStats = useMemo(() => {
+    const stats = new Map((candidatesQuery.data?.topic_stats || []).map((item) => [item.topic_id, item]));
+    return topics.map((topic) => ({
+      topic,
+      count: stats.get(topic.id)?.count || 0,
+      best: normalizeScore(stats.get(topic.id)?.best_score || 0),
+    }));
+  }, [candidatesQuery.data?.topic_stats, topics]);
 
-  const mainCount = matchedItems.filter((item) => normalizeScore(item.scoring?.final_score || 0) >= 80).length;
-  const reserveCount = matchedItems.filter((item) => {
-    const score = normalizeScore(item.scoring?.final_score || 0);
-    return score >= 65 && score < 80;
-  }).length;
-  const avgScore = matchedItems.length
-    ? Math.round(matchedItems.reduce((sum, item) => sum + normalizeScore(item.scoring?.final_score || 0), 0) / matchedItems.length)
-    : 0;
-  const selectedTopicMeta = topics.find((topic) => topic.name === selectedTopic);
+  const mainCount = candidatesQuery.data?.main_count || 0;
+  const reserveCount = candidatesQuery.data?.reserve_count || 0;
+  const avgScore = Math.round(candidatesQuery.data?.average_score || 0);
+  const total = candidatesQuery.data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / 20));
   const visibleContentIds = useMemo(() => filtered.map((item) => item.content.id), [filtered]);
   const contentFavoriteState = useContentFavoriteStates(visibleContentIds);
 
@@ -378,7 +375,7 @@ export default function MyTopicsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedTopic('')}
+                onClick={() => { setSelectedTopic(''); setPage(1); }}
                 className={cx(
                   'rounded-full border px-2 py-1 text-[11px] font-black transition',
                   selectedTopic ? 'border-gray-200 bg-white text-gray-500 hover:border-primary-border hover:text-primary' : 'border-primary-border bg-primary-light text-primary',
@@ -396,7 +393,7 @@ export default function MyTopicsPage() {
                   count={count}
                   bestScore={best}
                   active={selectedTopic === topic.name}
-                  onClick={() => setSelectedTopic(topic.name)}
+                  onClick={() => { setSelectedTopic(topic.name); setPage(1); }}
                 />
               ))}
             </div>
@@ -441,7 +438,7 @@ export default function MyTopicsPage() {
 
         <section className="min-w-0">
           <div className="mb-3 grid grid-cols-2 gap-2.5 min-[1320px]:grid-cols-4">
-            <Metric label="匹配内容" value={matchedItems.length} colorClass="text-gray-900" />
+            <Metric label="匹配内容" value={total} colorClass="text-gray-900" />
             <Metric label="主推候选" value={mainCount} colorClass="text-primary" />
             <Metric label="储备候选" value={reserveCount} colorClass="text-amber" />
             <Metric label="平均匹配" value={avgScore} colorClass="text-teal" />
@@ -454,11 +451,11 @@ export default function MyTopicsPage() {
                 {selectedTopic || '全部母题'}候选
               </div>
               <div className="mt-1 text-xs text-gray-400">
-                当前显示 {filtered.length} 条，按母题最终得分降序排列
+                共 {total} 条，当前第 {page}/{totalPages} 页，按母题最终得分降序排列
               </div>
             </div>
-            <Button type="button" onClick={() => void refetch()} disabled={loading} variant="secondary">
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 重新打分
+            <Button type="button" onClick={() => void candidatesQuery.refetch()} disabled={candidatesQuery.isFetching} variant="secondary">
+              <RefreshCw size={13} className={candidatesQuery.isFetching ? 'animate-spin' : ''} /> 重新打分
             </Button>
           </Panel>
 
@@ -489,6 +486,17 @@ export default function MyTopicsPage() {
                   onRead={openReader}
                 />
               ))}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                    上一页
+                  </Button>
+                  <span className="text-xs font-bold text-gray-500">{page} / {totalPages}</span>
+                  <Button type="button" variant="secondary" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
+                    下一页
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 

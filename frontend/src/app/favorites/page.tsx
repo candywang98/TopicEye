@@ -15,7 +15,10 @@ import {
   X,
 } from 'lucide-react';
 import { creationApi, favoritesApi } from '@/lib/api';
-import { useAppContext } from '@/components/ClientLayout';
+import { useFavoritesStore } from '@/providers/AppProvider';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFavoritesBoardQuery } from '@/hooks/queries/useFavoritesQueries';
+import { queryKeys } from '@/lib/query-keys';
 import CreationPlanDisplay, { type CreationPlan } from '@/components/CreationPlanDisplay';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import type { FavoriteItem, FavoriteStatus, FavoriteTargetType } from '@/types';
@@ -45,11 +48,11 @@ import {
 } from './_favorites-utils';
 
 export default function FavoritesPage() {
-  const { refreshCounts } = useAppContext();
+  const refreshCounts = useFavoritesStore((state) => state.refreshCounts);
+  const queryClient = useQueryClient();
   const initialFilters = useMemo(() => getInitialFavoriteFilters(), []);
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [targetType, setTargetType] = useState<FavoriteTargetType | ''>(initialFilters.targetType);
   const [status, setStatus] = useState<FavoriteStatus | ''>(initialFilters.status);
@@ -74,49 +77,46 @@ export default function FavoritesPage() {
   const [editTags, setEditTags] = useState('');
   const [editPending, setEditPending] = useState(false);
 
+  const favoriteQueryParams = useMemo(() => ({
+    page_size: FAVORITES_PAGE_SIZE,
+    target_type: targetType,
+    status,
+    keyword: keyword.trim() || undefined,
+  }), [keyword, status, targetType]);
+  const favoritesQuery = useFavoritesBoardQuery(favoriteQueryParams);
+  const loading = favoritesQuery.isLoading;
+
+  useEffect(() => {
+    if (!favoritesQuery.data) return;
+    setItems(favoritesQuery.data.items);
+    setTotal(favoritesQuery.data.total);
+    setSelectedIds(new Set());
+    setDirtyStatuses(new Set());
+    setSavedNotice(null);
+    setDraggingId(null);
+    setDropTarget(null);
+  }, [favoritesQuery.data]);
+
+  useEffect(() => {
+    if (favoritesQuery.error) {
+      setError(favoritesQuery.error instanceof Error ? favoritesQuery.error.message : '收藏夹加载失败');
+    }
+  }, [favoritesQuery.error]);
+
+  const invalidateFavorites = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.favorites.all });
+  }, [queryClient]);
+
   const fetchFavorites = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
       setDraggingId(null);
       setDropTarget(null);
-      const firstPage = await favoritesApi.list({
-        page: 1,
-        page_size: FAVORITES_PAGE_SIZE,
-        target_type: targetType,
-        status,
-        keyword: keyword.trim() || undefined,
-      });
-      const totalItems = firstPage.total || 0;
-      const totalPages = Math.ceil(totalItems / FAVORITES_PAGE_SIZE);
-      const allItems = [...(firstPage.items || [])];
-      if (totalPages > 1) {
-        const rest = await Promise.all(
-          Array.from({ length: totalPages - 1 }, (_, index) => favoritesApi.list({
-            page: index + 2,
-            page_size: FAVORITES_PAGE_SIZE,
-            target_type: targetType,
-            status,
-            keyword: keyword.trim() || undefined,
-          }))
-        );
-        rest.forEach((page) => allItems.push(...(page.items || [])));
-      }
-      setItems(allItems);
-      setTotal(totalItems);
-      setSelectedIds(new Set());
-      setDirtyStatuses(new Set());
-      setSavedNotice(null);
+      await favoritesQuery.refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : '收藏夹加载失败');
-    } finally {
-      setLoading(false);
     }
-  }, [targetType, status, keyword]);
-
-  useEffect(() => {
-    void fetchFavorites();
-  }, [fetchFavorites]);
+  }, [favoritesQuery]);
 
   const counts = useMemo(() => {
     const byStatus = STATUS_FLOW.reduce((acc, column) => {
@@ -211,6 +211,7 @@ export default function FavoritesPage() {
         tags: parseTagInput(editTags),
       });
       applyFavoriteUpdates([updated]);
+      await invalidateFavorites();
       cancelEdit();
     } catch (err) {
       setError(err instanceof Error ? err.message : '收藏备注保存失败');
@@ -246,6 +247,7 @@ export default function FavoritesPage() {
     try {
       const updated = await favoritesApi.update(item.id, { status: nextStatus });
       applyFavoriteUpdates([updated]);
+      await invalidateFavorites();
     } catch (err) {
       setError(err instanceof Error ? err.message : '状态更新失败');
     } finally {
@@ -324,6 +326,7 @@ export default function FavoritesPage() {
       setItems((prev) => prev.map((item) => byId.get(item.id) || item));
       setDirtyStatuses(new Set());
       setSavedNotice('排序已保存');
+      await invalidateFavorites();
     } catch (err) {
       const message = err instanceof Error ? err.message : '排序保存失败';
       await fetchFavorites();
@@ -331,7 +334,7 @@ export default function FavoritesPage() {
     } finally {
       setSavingOrder(false);
     }
-  }, [dirtyStatuses, fetchFavorites, items]);
+  }, [dirtyStatuses, fetchFavorites, invalidateFavorites, items]);
 
   const updateSelectedStatus = async (nextStatus: FavoriteStatus) => {
     if (selectedItems.length === 0) return;
@@ -341,6 +344,7 @@ export default function FavoritesPage() {
       const updated = await favoritesApi.bulkStatus(nextStatus, selectedItems.map((item) => item.id));
       applyFavoriteUpdates(updated);
       setSelectedIds(new Set());
+      await invalidateFavorites();
     } catch (err) {
       setError(err instanceof Error ? err.message : '批量更新失败');
     } finally {
@@ -361,6 +365,7 @@ export default function FavoritesPage() {
       });
       setTotal((prev) => Math.max(0, prev - 1));
       refreshCounts();
+      await invalidateFavorites();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除收藏失败');
     } finally {
@@ -378,6 +383,7 @@ export default function FavoritesPage() {
       setTotal((prev) => Math.max(0, prev - selectedItems.length));
       setSelectedIds(new Set());
       refreshCounts();
+      await invalidateFavorites();
     } catch (err) {
       setError(err instanceof Error ? err.message : '批量删除失败');
     } finally {
@@ -399,6 +405,7 @@ export default function FavoritesPage() {
       });
       setCreationDraft({ item: updated, platform: planPlatform, plan });
       applyFavoriteUpdates([updated]);
+      await invalidateFavorites();
     } catch (err) {
       setError(err instanceof Error ? err.message : '创作方案生成失败');
     } finally {
@@ -486,7 +493,18 @@ export default function FavoritesPage() {
         }}
         onMove={moveFavorite}
       />
+      {favoritesQuery.hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={favoritesQuery.isFetchingNextPage}
+            onClick={() => void favoritesQuery.fetchNextPage()}
+          >
+            {favoritesQuery.isFetchingNextPage ? '加载中...' : `继续加载（已显示 ${items.length}/${total}）`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
-

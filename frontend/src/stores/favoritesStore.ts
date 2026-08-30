@@ -176,8 +176,10 @@ export function createFavoritesStore(deps: {
         if (!currentUser) {
           if (!isTodayPicksPage) {
             const counts = await contentsApi.todayCount();
+            if (authStore.getState().currentUser) return;
             set({ todayPicksCount: counts.today_picks || 0 });
           }
+          if (authStore.getState().currentUser) return;
           set({
             sourceCount: 0,
             favoriteTotal: 0,
@@ -194,6 +196,7 @@ export function createFavoritesStore(deps: {
             : sourcesApi.listMine({ page_size: 1 }),
           favoritesApi.index(),
         ]);
+        if (authStore.getState().currentUser?.id !== currentUser.id) return;
         if (counts) set({ todayPicksCount: counts.today_picks || 0 });
         set({ sourceCount: sources ? sources.total || sources.items?.length || 0 : 0 });
         set({ favoriteTotal: favIndex.total || 0 });
@@ -403,8 +406,11 @@ export function createFavoritesStore(deps: {
     },
 
     _loadFromIndex: async () => {
+      const userId = authStore.getState().currentUser?.id;
+      if (!userId) return;
       try {
         const favIndex = await favoritesApi.index();
+        if (authStore.getState().currentUser?.id !== userId) return;
         const targetKeys = new Set<string>();
         const targetIds = new Map<string, number>();
         const contentIds = new Set<number>();

@@ -5,7 +5,9 @@ Weekly Digest schema — request/response models.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.schemas._normalizers import StrList
 
 
 class WeeklyDigestResponse(BaseModel):
@@ -16,7 +18,7 @@ class WeeklyDigestResponse(BaseModel):
     week_end: str
     overview: str | None = None
     takeaway: str | None = None
-    keywords: Any | None = None  # parsed JSON array
+    keywords: StrList = Field(default_factory=list)
     trends: Any | None = None  # parsed JSON array
     top_picks: Any | None = None  # parsed JSON array
     category_summary: Any | None = None  # parsed JSON object

@@ -8,8 +8,10 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
+from app.core.config import settings
+from app.models.analysis import AiAnalysis
 from app.models.content import ContentItem
 from app.repositories.content_event_consumption_repo import (
     ContentEventConsumptionRepository,
@@ -17,6 +19,7 @@ from app.repositories.content_event_consumption_repo import (
     EventDisplayGroup,
 )
 from app.repositories.ignored_repo import IgnoredRepo
+from app.repositories.topic_repo import TopicRepository
 from app.services.content_summary import clean_content_summary
 from app.services.duckdb_service import query_today_picks, query_topics, run_query
 from app.services.feedback_signal import get_feedback_scores
@@ -50,26 +53,7 @@ async def build_today_picks(
     source_weight 加成 / 风险门口径，保证两条路径行为等价。
     """
     duckdb_exc: Exception | None = None
-    try:
-        query_kwargs = {
-            "hours": hours,
-            "category": category,
-            "content_type": content_type,
-            "limit": limit,
-            # DuckDB supplies candidates; the unified scorer below is the only final gate.
-            "curation_threshold": 0,
-        }
-        if owner_user_id is not None:
-            query_kwargs["visible_user_id"] = owner_user_id
-            query_kwargs["public_only"] = False
-        rows = await run_query(lambda: query_today_picks(**query_kwargs))
-    except Exception as exc:
-        duckdb_exc = exc
-        logger.warning(
-            "today_picks DuckDB analytical layer unavailable, falling back to OLTP query: %s",
-            exc,
-            exc_info=True,
-        )
+    if settings.ANALYTICS_ENGINE == "postgres":
         try:
             rows = await _build_today_picks_via_oltp(
                 db,
@@ -80,14 +64,49 @@ async def build_today_picks(
                 owner_user_id=owner_user_id,
             )
         except Exception as oltp_exc:
-            # OLTP 路径也挂了：记双错误，回退到空 payload（避免 5xx）
             logger.error(
-                "today_picks OLTP fallback also failed: %s (original DuckDB error: %s)",
+                "today_picks PostgreSQL query failed: %s",
                 oltp_exc,
-                duckdb_exc,
                 exc_info=True,
             )
             return _empty_payload()
+    else:
+        try:
+            query_kwargs = {
+                "hours": hours,
+                "category": category,
+                "content_type": content_type,
+                "limit": limit,
+                "curation_threshold": 0,
+            }
+            if owner_user_id is not None:
+                query_kwargs["visible_user_id"] = owner_user_id
+                query_kwargs["public_only"] = False
+            rows = await run_query(lambda: query_today_picks(**query_kwargs))
+        except Exception as exc:
+            duckdb_exc = exc
+            logger.warning(
+                "today_picks DuckDB unavailable, falling back to PostgreSQL: %s",
+                exc,
+                exc_info=True,
+            )
+            try:
+                rows = await _build_today_picks_via_oltp(
+                    db,
+                    hours=hours,
+                    category=category,
+                    content_type=content_type,
+                    limit=limit,
+                    owner_user_id=owner_user_id,
+                )
+            except Exception as oltp_exc:
+                logger.error(
+                    "today_picks PostgreSQL fallback failed: %s (DuckDB error: %s)",
+                    oltp_exc,
+                    duckdb_exc,
+                    exc_info=True,
+                )
+                return _empty_payload()
 
     event_repo = ContentEventConsumptionRepository(db)
     try:
@@ -150,10 +169,23 @@ async def build_today_picks(
         for item in response_items:
             item["personalization_boost"] = 0.0
     try:
-        topic_map = {topic["id"]: topic for topic in await run_query(query_topics)}
+        if settings.ANALYTICS_ENGINE == "postgres":
+            topics = await TopicRepository(db).list_ordered_by_best_score()
+            topic_map = {
+                topic.id: {
+                    "id": topic.id,
+                    "name": topic.name,
+                    "summary": topic.summary,
+                    "keywords": topic.keywords or [],
+                    "best_score": topic.best_score or 0,
+                    "content_count": topic.content_count or 0,
+                }
+                for topic in topics
+            }
+        else:
+            topic_map = {topic["id"]: topic for topic in await run_query(query_topics)}
     except Exception as exc:
-        # topics 拉取失败：不阻塞主结果，只是不带话题关联
-        logger.warning("today_picks query_topics failed, continuing without topics: %s", exc, exc_info=True)
+        logger.warning("today_picks topics query failed, continuing without topics: %s", exc, exc_info=True)
         topic_map = {}
 
     return _pack_today_picks(
@@ -192,8 +224,18 @@ async def _build_today_picks_via_oltp(
     stmt = (
         select(ContentItem)
         .options(
-            selectinload(ContentItem.analyses),
+            contains_eager(ContentItem.analyses),
             selectinload(ContentItem.source),
+        )
+        .join(
+            AiAnalysis,
+            AiAnalysis.id
+            == select(AiAnalysis.id)
+            .where(AiAnalysis.content_id == ContentItem.id)
+            .order_by(AiAnalysis.created_at.desc(), AiAnalysis.id.desc())
+            .limit(1)
+            .correlate(ContentItem)
+            .scalar_subquery(),
         )
         .where(ContentItem.crawled_at >= cutoff)
         .order_by(ContentItem.crawled_at.desc())
@@ -435,17 +477,21 @@ def _row_to_content_payload(row: dict, breakdown: ScoreBreakdown) -> dict:
 
 
 def _decode_json_value(value):
-    if not isinstance(value, str):
-        return value
-    stripped = value.strip()
-    if not stripped or stripped == "null":
-        return None
-    if stripped[0] not in "[{":
-        return value
-    try:
-        return json.loads(stripped)
-    except json.JSONDecodeError:
-        return value
+    candidate = value
+    for _ in range(3):
+        if not isinstance(candidate, str):
+            return candidate
+        stripped = candidate.strip()
+        if not stripped or stripped == "null":
+            return None
+        try:
+            decoded = json.loads(stripped)
+        except json.JSONDecodeError:
+            return candidate
+        if decoded == candidate:
+            return candidate
+        candidate = decoded
+    return candidate
 
 
 def _clean_optional_text(value):

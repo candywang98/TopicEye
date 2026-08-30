@@ -56,9 +56,16 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
-echo "==> 运行全量测试（${PYTHON}）..."
+if [ "$#" -eq 0 ]; then
+  set -- tests/
+fi
+
+echo "==> 运行测试（${PYTHON}）..."
 cd "$BACKEND_DIR"
 DATABASE_URL="postgresql+asyncpg://topiceye:topiceye@127.0.0.1:${PORT}/topiceye_test" \
+ALLOW_TEST_DATABASE_TRUNCATE=true \
+EXPECTED_TEST_DATABASE_HOST=127.0.0.1 \
+EXPECTED_TEST_DATABASE_PORT="${PORT}" \
 DUCKDB_THREADS=1 \
 DUCKDB_MEMORY_LIMIT=128MB \
-  "$PYTHON" -m pytest tests/ -q --tb=short "$@"
+  "$PYTHON" -m pytest -q --tb=short "$@"

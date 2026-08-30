@@ -22,9 +22,15 @@ from app.models.source import Source, SourceStatus, SourceType
 from app.models.user import User
 from app.repositories.source_repo import SourceRepository
 from app.schemas.source import (
+    SourceBatchPreviewResponse,
     SourceCreate,
+    SourceEvidenceProfileResponse,
+    SourceEvidenceProfileUpdateResponse,
+    SourceImportResponse,
     SourceListResponse,
+    SourceRecognitionResponse,
     SourceReorderRequest,
+    SourceReorderResponse,
     SourceResponse,
     SourceUpdate,
     SyncResultResponse,
@@ -229,7 +235,7 @@ async def list_my_sources(
     )
 
 
-@router.get("/me/recognize")
+@router.get("/me/recognize", response_model=SourceRecognitionResponse)
 async def recognize_my_source_url(
     url: str = Query(..., min_length=3, max_length=2048, description="用户粘贴的信源 URL"),
     name: str | None = Query(None, description="可选信源名，辅助识别 handle"),
@@ -405,7 +411,11 @@ async def sync_my_source(
 # ── Source Evidence Profiles (admin-managed credible lead config) ───────
 
 
-@router.get("/{source_id}/evidence-profile", dependencies=[Depends(get_current_admin_user)])
+@router.get(
+    "/{source_id}/evidence-profile",
+    response_model=SourceEvidenceProfileResponse,
+    dependencies=[Depends(get_current_admin_user)],
+)
 async def get_evidence_profile(source_id: int, db: AsyncSession = Depends(get_db)):
     """Get the evidence profile for a source."""
     from app.repositories.evidence_profile_repo import SourceEvidenceProfileRepository
@@ -427,7 +437,11 @@ async def get_evidence_profile(source_id: int, db: AsyncSession = Depends(get_db
     }
 
 
-@router.put("/{source_id}/evidence-profile", dependencies=[Depends(get_current_admin_user)])
+@router.put(
+    "/{source_id}/evidence-profile",
+    response_model=SourceEvidenceProfileUpdateResponse,
+    dependencies=[Depends(get_current_admin_user)],
+)
 async def upsert_evidence_profile(source_id: int, data: dict, db: AsyncSession = Depends(get_db)):
     """Create or update the evidence profile for a source."""
     from app.models.source_evidence_profile import PublisherKind
@@ -450,7 +464,7 @@ async def upsert_evidence_profile(source_id: int, data: dict, db: AsyncSession =
     return {"source_id": source_id, "updated": True}
 
 
-@router.post("/reorder", dependencies=[Depends(get_current_admin_user)])
+@router.post("/reorder", response_model=SourceReorderResponse, dependencies=[Depends(get_current_admin_user)])
 async def reorder_sources(data: SourceReorderRequest, db: AsyncSession = Depends(get_db)):
     """Persist source order for one kanban lane or the current ordered subset."""
     unique_ids = list(dict.fromkeys(data.ordered_ids))
@@ -473,7 +487,7 @@ async def reorder_sources(data: SourceReorderRequest, db: AsyncSession = Depends
     return {"message": "信源顺序已保存", "updated": len(unique_ids)}
 
 
-@router.post("/import-opml", dependencies=[Depends(get_current_admin_user)])
+@router.post("/import-opml", response_model=SourceImportResponse, dependencies=[Depends(get_current_admin_user)])
 async def import_opml(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -532,7 +546,11 @@ async def import_opml(
     }
 
 
-@router.post("/preview-batch", dependencies=[Depends(get_current_admin_user)])
+@router.post(
+    "/preview-batch",
+    response_model=SourceBatchPreviewResponse,
+    dependencies=[Depends(get_current_admin_user)],
+)
 async def preview_source_batch(
     data: SourceBatchImportRequest,
     db: AsyncSession = Depends(get_db),
@@ -547,7 +565,7 @@ async def preview_source_batch(
     }
 
 
-@router.post("/import-batch", dependencies=[Depends(get_current_admin_user)])
+@router.post("/import-batch", response_model=SourceImportResponse, dependencies=[Depends(get_current_admin_user)])
 async def import_source_batch(
     data: SourceBatchImportRequest,
     db: AsyncSession = Depends(get_db),

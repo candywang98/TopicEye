@@ -11,7 +11,7 @@ import {
   Send,
   XCircle,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Panel, cx } from '@/components/ui';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
 import { LoadingState } from '@/components/StateView';
@@ -51,7 +51,8 @@ function formatDuration(ms: number): string {
 }
 
 export default function WebhookLogsPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [logs, setLogs] = useState<WebhookDeliveryLogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);

@@ -29,8 +29,7 @@ export function useAuthStore<T>(selector: (s: AuthState) => T): T {
 }
 
 /**
- * 向后兼容 hook：订阅整个 auth store（与原 useContext(AuthContext) 行为一致）。
- * 38 个现有消费者通过 useAppContext() 间接使用，无需改动。
+ * 布局兼容 hook：订阅整个 auth store。业务组件应优先使用 selector。
  */
 export function useAuthContext(): AuthContextType {
   const store = useContext(AuthStoreContext);
@@ -52,12 +51,20 @@ export function useAuthStoreApi(): AuthStore {
 
 export function AuthProvider({
   children,
-  initialUser = null,
+  initialUser,
+  initialUserResolved,
   initialFeatureFlags,
+  initialFeatureFlagsResolved,
+  initialLocalMode,
+  initialLocalModeResolved,
 }: {
   children: React.ReactNode;
-  initialUser?: AuthUser | null;
-  initialFeatureFlags?: Record<string, boolean>;
+  initialUser: AuthUser | null;
+  initialUserResolved: boolean;
+  initialFeatureFlags: Record<string, boolean>;
+  initialFeatureFlagsResolved: boolean;
+  initialLocalMode: boolean;
+  initialLocalModeResolved: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,7 +74,11 @@ export function AuthProvider({
   if (!storeRef.current) {
     storeRef.current = createAuthStore({
       user: initialUser,
+      userResolved: initialUserResolved,
       featureFlags: initialFeatureFlags,
+      featureFlagsResolved: initialFeatureFlagsResolved,
+      localMode: initialLocalMode,
+      localModeResolved: initialLocalModeResolved,
     });
   }
   const store = storeRef.current;
@@ -75,93 +86,123 @@ export function AuthProvider({
   // 读取响应式 state（用于路由守卫 effect）
   const authLoading = useStore(store, (s) => s.authLoading);
   const featuresLoading = useStore(store, (s) => s.featuresLoading);
+  const localModeLoading = useStore(store, (s) => s.localModeLoading);
+  const localMode = useStore(store, (s) => s.localMode);
   const currentUser = useStore(store, (s) => s.currentUser);
   const enabledFeatures = useStore(store, (s) => s.enabledFeatures);
 
-  // 启动时校验 token、拉用户信息
-  // SSR 预取已返回用户信息时跳过此 useEffect，避免重复请求。
+  // SSR 失败与「成功但未登录」必须区分。失败时在客户端持续重试，并让路由守卫
+  // 保持暂停；只有部署模式与用户身份都得到明确结果后才解除 loading。
   useEffect(() => {
-    if (initialUser) return; // SSR 已预取，跳过
+    if (initialUserResolved && initialLocalModeResolved) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
 
-    (async () => {
+    const scheduleRetry = () => {
+      if (cancelled) return;
+      retryCount += 1;
+      retryTimer = setTimeout(resolveAuth, Math.min(1000 * retryCount, 10000));
+    };
+
+    const resolveAuth = async () => {
+      let resolvedLocalMode = store.getState().localMode;
+      if (!initialLocalModeResolved && store.getState().localModeLoading) {
+        try {
+          const config = await authApi.oauthProviders();
+          if (cancelled) return;
+          resolvedLocalMode = config.local_no_login_enabled === true;
+          store.setState({ localMode: resolvedLocalMode, localModeLoading: false });
+        } catch {
+          scheduleRetry();
+          return;
+        }
+      }
+
+      if (initialUserResolved || !store.getState().authLoading) return;
       const token = getAuthToken();
-      if (!token) {
-        store.setState({ authLoading: false });
+      if (!token && !resolvedLocalMode) {
+        store.setState({ currentUser: null, authLoading: false });
         return;
       }
+
       try {
-        // 启动时只在 session 即将过期时主动 refresh（剩余 < SESSION_REFRESH_THRESHOLD）。
-        const expiresAtStr = getAuthTokenExpiresAt();
-        const shouldRefresh =
-          !expiresAtStr || new Date(expiresAtStr) < new Date(Date.now() + 7 * 86400000);
-        if (shouldRefresh) {
-          try {
-            const refreshed = await authApi.refresh();
-            if (!cancelled) {
-              setAuthTokenExpiresAt(refreshed.expires_at);
+        // 启动时只在普通登录 session 即将过期时主动 refresh。
+        if (token) {
+          const expiresAtStr = getAuthTokenExpiresAt();
+          const shouldRefresh =
+            !expiresAtStr || new Date(expiresAtStr) < new Date(Date.now() + 7 * 86400000);
+          if (shouldRefresh) {
+            try {
+              const refreshed = await authApi.refresh();
+              if (!cancelled) setAuthTokenExpiresAt(refreshed.expires_at);
+            } catch {
+              // 继续走 me()；它会给出最终身份结果或触发下一轮网络重试。
             }
-          } catch {
-            // refresh 失败不阻塞——继续走 me()，me() 的 401 拦截器会再试一次
           }
         }
         const user = await authApi.me();
-        if (!cancelled) store.setState({ currentUser: user });
+        if (!cancelled) store.setState({ currentUser: user, authLoading: false });
       } catch (err) {
-        // 仅在 token 真正无效（401/403）时登出；
-        // 网络错误（后端重启中）或 5xx 保留 token，避免热更新期间被误登出。
         const isAuthFail =
           err instanceof Error && (err as Error & { isAuthError?: boolean }).isAuthError;
         if (isAuthFail) {
-          // Token 无效（401/403）→ 清本地 token，不调后端 logout（也会失败）
-          setAuthToken(null);
-          if (!cancelled) store.setState({ currentUser: null });
+          if (token) setAuthToken(null);
+          if (!cancelled) store.setState({ currentUser: null, authLoading: false });
+          return;
         }
-      } finally {
-        if (!cancelled) store.setState({ authLoading: false });
+        scheduleRetry();
       }
-    })();
+    };
 
+    void resolveAuth();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [store, initialUser]);
+  }, [initialLocalModeResolved, initialUserResolved, store]);
 
-  // 拉取功能模块开关（管理员端点，普通用户 403 时回退空对象）
-  // SSR 预取已返回 feature flags 时跳过此 useEffect。
+  // 成功返回的空 flags 是已解析状态；网络/服务错误则保持 loading 并重试。
   useEffect(() => {
-    if (initialFeatureFlags) return; // SSR 已预取，跳过
+    if (initialFeatureFlagsResolved) return;
     let cancelled = false;
-    (async () => {
-      if (!getAuthToken()) {
-        store.setState({ featuresLoading: false });
-        return;
-      }
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+
+    const loadFeatureFlags = async () => {
       try {
         const { flags } = await settingsApi.getFeatureFlags();
-        if (!cancelled) store.setState({ enabledFeatures: flags || {} });
+        if (!cancelled) {
+          store.setState({ enabledFeatures: flags || {}, featuresLoading: false });
+        }
       } catch {
-        // 非管理员或端点不可用：保持默认空对象（feature 全部视为关）
-        if (!cancelled) store.setState({ enabledFeatures: {} });
-      } finally {
-        if (!cancelled) store.setState({ featuresLoading: false });
+        if (cancelled) return;
+        retryCount += 1;
+        retryTimer = setTimeout(loadFeatureFlags, Math.min(1000 * retryCount, 10000));
       }
-    })();
+    };
+
+    void loadFeatureFlags();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [store, initialFeatureFlags]);
+  }, [initialFeatureFlagsResolved, store]);
 
-  // 路由守卫：feature 关闭或权限不足时踢回首页/登录
+  // 路由守卫：等待所有预取结果明确后再判断，避免 SSR 失败时误跳登录页。
   useEffect(() => {
-    if (authLoading || featuresLoading) return;
+    if (authLoading || featuresLoading || localModeLoading) return;
+    if (localMode && (pathname === '/login' || pathname === '/plans')) {
+      router.replace('/');
+      return;
+    }
     if (canAccessPath(pathname, currentUser, enabledFeatures)) return;
     router.replace(
       requiredAccessForPath(pathname, enabledFeatures) === 'admin' && currentUser
         ? '/'
         : '/login',
     );
-  }, [authLoading, featuresLoading, currentUser, enabledFeatures, pathname, router]);
+  }, [authLoading, featuresLoading, localModeLoading, localMode, currentUser, enabledFeatures, pathname, router]);
 
   return <AuthStoreContext.Provider value={store}>{children}</AuthStoreContext.Provider>;
 }

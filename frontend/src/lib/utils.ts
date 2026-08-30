@@ -19,64 +19,90 @@ export const weightStars = (w: number) =>
 // ─── Analysis extract helpers (topics/[id] page) ───
 
 export function extractRiskNotes(analysis: ContentAnalysis | null): string[] {
-  if (!analysis?.risk_notes) return [];
-  if (typeof analysis.risk_notes === 'string') {
-    return analysis.risk_notes ? [analysis.risk_notes] : [];
-  }
-  if (Array.isArray(analysis.risk_notes)) {
-    return analysis.risk_notes.filter((n: unknown) => typeof n === 'string' && n.length > 0);
-  }
-  if (typeof analysis.risk_notes === 'object') {
-    const obj = analysis.risk_notes as Record<string, unknown>;
-    const notes: string[] = [];
-    for (const v of Object.values(obj)) {
-      if (typeof v === 'string' && v.length > 0) notes.push(v);
-      if (Array.isArray(v)) {
-        for (const item of v) {
-          if (typeof item === 'string' && item.length > 0) notes.push(item);
-        }
-      }
+  let candidate: unknown = analysis?.risk_notes;
+  if (!candidate) return [];
+
+  if (typeof candidate === 'string') {
+    const text = candidate.trim();
+    if (!text) return [];
+    try {
+      candidate = JSON.parse(text) as unknown;
+    } catch {
+      return [text];
     }
-    return notes;
+  }
+
+  if (typeof candidate === 'string') {
+    return candidate.trim() ? [candidate.trim()] : [];
+  }
+  if (Array.isArray(candidate)) {
+    return normalizeStringList(candidate);
+  }
+  if (typeof candidate === 'object') {
+    return [...new Set(
+      Object.values(candidate as Record<string, unknown>)
+        .flatMap((value) => normalizeStringList(value)),
+    )];
   }
   return [];
+}
+
+export function normalizeStringList(value: unknown): string[] {
+  let candidate = value;
+
+  if (typeof candidate === 'string') {
+    const text = candidate.trim();
+    if (!text) return [];
+
+    try {
+      candidate = JSON.parse(text) as unknown;
+    } catch {
+      candidate = text;
+    }
+  }
+
+  if (typeof candidate === 'string') {
+    candidate = [candidate];
+  }
+  if (!Array.isArray(candidate)) return [];
+
+  return [...new Set(
+    candidate
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )];
+}
+
+export function normalizeTagList(value: unknown): string[] {
+  if (typeof value !== 'string') return normalizeStringList(value);
+
+  const text = value.trim();
+  if (!text) return [];
+  try {
+    return normalizeStringList(JSON.parse(text) as unknown);
+  } catch {
+    return [...new Set(text.split(',').map((tag) => tag.trim()).filter(Boolean))];
+  }
 }
 
 export function extractCreatorAngles(analysis: ContentAnalysis | null): string[] {
-  if (!analysis?.creator_angles) return [];
-  if (Array.isArray(analysis.creator_angles)) {
-    return analysis.creator_angles.filter((a: unknown) => typeof a === 'string');
-  }
-  return [];
+  return normalizeStringList(analysis?.creator_angles);
 }
 
 export function extractTags(item: ContentItem, analysis: ContentAnalysis | null): string[] {
-  const tags: string[] = [];
-  if (item.tags && Array.isArray(item.tags)) {
-    tags.push(...item.tags);
-  }
-  if (analysis?.tags && Array.isArray(analysis.tags)) {
-    for (const t of analysis.tags) {
-      if (!tags.includes(t)) tags.push(t);
-    }
-  }
-  return tags;
+  return [...new Set([
+    ...normalizeTagList(item.tags),
+    ...normalizeTagList(analysis?.tags),
+  ])];
 }
 
 export function extractTitleSuggestions(analysis: ContentAnalysis | null): string[] {
-  if (!analysis?.title_suggestions) return [];
-  if (Array.isArray(analysis.title_suggestions)) {
-    return analysis.title_suggestions.filter((t: unknown) => typeof t === 'string');
-  }
-  return [];
+  return normalizeStringList(analysis?.title_suggestions);
 }
 
 export function extractKeyPoints(analysis: ContentAnalysis | null): string[] {
-  if (!analysis?.key_points) return [];
-  if (Array.isArray(analysis.key_points)) {
-    return analysis.key_points.filter((p: unknown) => typeof p === 'string');
-  }
-  return [];
+  return normalizeStringList(analysis?.key_points);
 }
 
 // ─── Tag color helper (today-picks) ───

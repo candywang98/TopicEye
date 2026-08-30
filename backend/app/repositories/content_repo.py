@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from sqlalchemy import Text, cast, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from app.core.config import settings
 from app.core.database import database_profile
@@ -666,7 +666,7 @@ class ContentRepo(BaseRepository[ContentItem]):
         stmt = (
             select(self.model)
             .options(
-                selectinload(self.model.analyses),
+                contains_eager(self.model.analyses),
                 selectinload(self.model.source),
             )
             .join(AiAnalysis, AiAnalysis.id == latest_analysis_id)
@@ -705,7 +705,7 @@ class ContentRepo(BaseRepository[ContentItem]):
         stmt = (
             select(self.model)
             .options(
-                selectinload(self.model.analyses),
+                contains_eager(self.model.analyses),
                 selectinload(self.model.source),
             )
             .join(AiAnalysis, AiAnalysis.id == latest_analysis_id)
@@ -759,7 +759,7 @@ class ContentRepo(BaseRepository[ContentItem]):
         data_stmt = (
             select(self.model)
             .options(
-                selectinload(self.model.analyses),
+                contains_eager(self.model.analyses),
                 selectinload(self.model.source),
             )
             .join(AiAnalysis, AiAnalysis.id == latest_analysis_id)

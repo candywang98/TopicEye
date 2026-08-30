@@ -23,6 +23,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.repositories.daily_report_repo import DailyReportRepository
@@ -31,6 +32,7 @@ from app.schemas.skill import SkillTodayPicksResponse, SkillTrendsResponse
 from app.services import duckdb_service
 from app.services.daily_report import get_latest_today_report
 from app.services.today_picks import build_today_picks
+from app.services.trends import get_keyword_cloud, get_topic_trends
 
 logger = logging.getLogger(__name__)
 
@@ -99,13 +101,21 @@ async def skill_trends(
     response: Response,
     days: int = Query(7, ge=1, le=30, description="回看天数"),
     limit: int = Query(50, ge=10, le=200, description="关键词返回上限"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SkillTrendsResponse:
     try:
-        topics = await duckdb_service.run_query(lambda: duckdb_service.query_trend_topics(days=days))
-        keywords = await duckdb_service.run_query(lambda: duckdb_service.query_keyword_cloud(days=days, limit=limit))
+        if settings.ANALYTICS_ENGINE == "duckdb":
+            topics = await duckdb_service.run_query(lambda: duckdb_service.query_trend_topics(days=days))
+            keywords = await duckdb_service.run_query(
+                lambda: duckdb_service.query_keyword_cloud(days=days, limit=limit)
+            )
+        else:
+            topics = await get_topic_trends(db, days=days)
+            keywords = await get_keyword_cloud(db, days=days, limit=limit)
     except Exception as exc:
-        logger.exception("skill trends DuckDB query failed")
-        raise HTTPException(status_code=503, detail="DuckDB analytical layer unavailable") from exc
-    response.headers["X-Analytics-Backend"] = "duckdb"
+        logger.exception("skill trends query failed")
+        engine_label = "DuckDB" if settings.ANALYTICS_ENGINE == "duckdb" else "PostgreSQL"
+        raise HTTPException(status_code=503, detail=f"{engine_label} analytical layer unavailable") from exc
+    response.headers["X-Analytics-Backend"] = settings.ANALYTICS_ENGINE
     return SkillTrendsResponse(days=days, topics=topics, keywords=keywords)

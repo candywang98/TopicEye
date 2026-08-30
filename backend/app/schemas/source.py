@@ -4,9 +4,10 @@ import json
 from datetime import datetime
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, JsonValue, field_validator, model_validator
 
 from app.models.source import SourceStatus, SourceType
+from app.schemas._normalizers import StrList
 from app.utils.url_safety import hostname_is_blocked
 
 API_SOURCE_ALLOWED_METHODS = {"GET", "POST"}
@@ -247,3 +248,57 @@ class SyncResultResponse(BaseModel):
     source_info: SourceResponse
 
     model_config = {"from_attributes": True}
+
+
+class SourceRecognitionResponse(BaseModel):
+    source_type: str
+    normalized_url: str
+    extra_config: dict[str, JsonValue] | None = None
+
+
+class SourceEvidenceProfileDetailResponse(BaseModel):
+    publisher_identity: str
+    publisher_family: str
+    platform: str
+    publisher_kind: str
+    official_domains: StrList = Field(default_factory=list)
+    verification_proof_url: str | None = None
+    reviewed_at: datetime | None = None
+
+
+class SourceEvidenceProfileResponse(BaseModel):
+    source_id: int
+    profile: SourceEvidenceProfileDetailResponse | None = None
+
+
+class SourceEvidenceProfileUpdateResponse(BaseModel):
+    source_id: int
+    updated: bool
+
+
+class SourceReorderResponse(BaseModel):
+    message: str
+    updated: int
+
+
+class SourceImportResponse(BaseModel):
+    created: int
+    skipped: int
+    total: int
+    message: str
+
+
+class SourceBatchPreviewItemResponse(BaseModel):
+    name: str
+    url: str
+    source_type: str
+    category: str
+    platform: str | None = None
+    duplicate: bool
+
+
+class SourceBatchPreviewResponse(BaseModel):
+    items: list[SourceBatchPreviewItemResponse] = Field(default_factory=list)
+    total: int
+    duplicates: int
+    importable: int

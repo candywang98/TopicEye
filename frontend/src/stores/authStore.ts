@@ -28,6 +28,8 @@ export interface AuthState {
   authLoading: boolean;
   enabledFeatures: Record<string, boolean>;
   featuresLoading: boolean;
+  localMode: boolean;
+  localModeLoading: boolean;
   /** 登录成功后写入 token + 用户 */
   applyAuthSession: (session: AuthTokenResponse) => void;
   /** 更新功能开关 */
@@ -45,14 +47,19 @@ export type AuthContextType = AuthState;
 
 export function createAuthStore(initial: {
   user: AuthUser | null;
-  featureFlags?: Record<string, boolean>;
+  userResolved: boolean;
+  featureFlags: Record<string, boolean>;
+  featureFlagsResolved: boolean;
+  localMode: boolean;
+  localModeResolved: boolean;
 }): AuthStore {
   return createStore<AuthState>((set) => ({
     currentUser: initial.user,
-    // SSR 预取已返回用户信息时跳过 authLoading 白屏阶段
-    authLoading: !initial.user,
-    enabledFeatures: initial.featureFlags ?? {},
-    featuresLoading: !initial.featureFlags,
+    authLoading: !initial.userResolved,
+    enabledFeatures: initial.featureFlags,
+    featuresLoading: !initial.featureFlagsResolved,
+    localMode: initial.localMode,
+    localModeLoading: !initial.localModeResolved,
 
     applyAuthSession: (session: AuthTokenResponse) => {
       setAuthToken(session.access_token);

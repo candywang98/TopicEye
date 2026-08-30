@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 
@@ -45,20 +46,20 @@ async def weekly_report(
     # ── 优先 DuckDB ──
     result = None
     backend = "oltp"
-    try:
-        from app.services.duckdb_service import get_analytics, run_query
+    if settings.ANALYTICS_ENGINE == "duckdb":
+        try:
+            from app.services.duckdb_service import get_analytics, run_query
 
-        analytics = get_analytics()
-        if await run_query(lambda: analytics.available):
-            result = await run_query(lambda: analytics.query_webnovel_weekly(days=days))
-            # 如果 DuckDB 返回的数据为空（SQL 错误被静默捕获），回退到 OLTP
-            if not result or result.get("summary", {}).get("total_items", 0) == 0:
-                logger.info("Webnovel weekly DuckDB returned empty, falling back to OLTP")
-                result = None
-            else:
-                backend = "duckdb"
-    except Exception as exc:
-        logger.debug("Webnovel weekly DuckDB path failed, falling back: %s", exc)
+            analytics = get_analytics()
+            if await run_query(lambda: analytics.available):
+                result = await run_query(lambda: analytics.query_webnovel_weekly(days=days))
+                if not result or result.get("summary", {}).get("total_items", 0) == 0:
+                    logger.info("Webnovel weekly DuckDB returned empty, falling back to OLTP")
+                    result = None
+                else:
+                    backend = "duckdb"
+        except Exception as exc:
+            logger.debug("Webnovel weekly DuckDB path failed, falling back: %s", exc)
 
     # ── OLTP fallback ──
     if result is None:

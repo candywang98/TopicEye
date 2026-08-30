@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { favoritesApi } from '@/lib/api';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
 
 function normalizeIds(ids: Array<number | null | undefined>): number[] {
   return Array.from(new Set(
@@ -13,7 +13,8 @@ function normalizeIds(ids: Array<number | null | undefined>): number[] {
 }
 
 export function useContentFavoriteStates(ids: Array<number | null | undefined>) {
-  const { currentUser, favorites } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const favorites = useFavoritesStore((state) => state.favorites);
   const [serverFavoriteIds, setServerFavoriteIds] = useState<Set<number>>(new Set());
   const [validatedKey, setValidatedKey] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);

@@ -177,8 +177,8 @@ export const statsApi = {
   },
 
   /** Aggregated stats workspace payload, with legacy dashboard fields included */
-  getDashboard(days = 7): Promise<StatsDashboard> {
-    return request(`/stats/dashboard?days=${days}`);
+  getDashboard(days = 7, options: RequestInit = {}): Promise<StatsDashboard> {
+    return request(`/stats/dashboard?days=${days}`, options);
   },
 };
 

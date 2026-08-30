@@ -4,7 +4,7 @@
  * 今日已选抽屉（一期补行动闭环）。
  *
  * 把 fire-and-forget 的「已选」标记汇总成一个可见抽屉：
- * - 列出今日 write 标记的选题，带「进 plan」入口；
+ * - 列出今日 write 标记的选题，有 content_id 时提供选题详情入口；
  * - 顶部显示「今日已选 N」+「共 M 个标记」；
  * - 空态引导回榜单。
  *
@@ -23,6 +23,7 @@ interface PickLike {
   source_url?: string;
   category?: string;
   platforms?: string[];
+  content_id?: number;
 }
 
 function pickKey(pick: PickLike): string {
@@ -135,12 +136,14 @@ export default function SelectedDrawer({
                         )}
                       </div>
                       <div className="mt-2 flex items-center gap-2">
-                        <a
-                          href="/plan"
-                          className="inline-flex items-center gap-1 rounded-xs bg-primary px-2.5 py-1 text-[11px] font-bold text-white hover:bg-primary-hover"
-                        >
-                          <Target size={11} /> 进 plan
-                        </a>
+                        {pick?.content_id && (
+                          <a
+                            href={`/topics/${pick.content_id}`}
+                            className="inline-flex items-center gap-1 rounded-xs bg-primary px-2.5 py-1 text-[11px] font-bold text-white hover:bg-primary-hover"
+                          >
+                            <Target size={11} /> 打开选题
+                          </a>
+                        )}
                         {pick?.source_url && (
                           <a
                             href={pick.source_url}

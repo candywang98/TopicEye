@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore, useReaderStore } from '@/providers/AppProvider';
 import SourceBadge from '@/components/SourceBadge';
 import { Badge, Button, Panel, cx } from '@/components/ui';
 import { feedbackApi } from '@/lib/api';
@@ -210,7 +210,7 @@ export function EditorialItem({
   onStartWorkflow: (item: ContentItem, isFavorited: boolean) => void;
   workflowPending: boolean;
 }) {
-  const { openReader } = useAppContext();
+  const openReader = useReaderStore((state) => state.openReader);
   const handleCardClick = useCallback(() => {
     if (item.analysis) {
       onShowAnalysis(item.analysis);
@@ -439,7 +439,7 @@ const FEEDBACK_OPTIONS: { type: FeedbackType; icon: LucideIcon; label: string; c
 ];
 
 export function FeedbackButtons({ contentId }: { contentId: number }) {
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const router = useRouter();
   const [activeFeedback, setActiveFeedback] = useState<FeedbackType | null>(null);
   const [showMore, setShowMore] = useState(false);

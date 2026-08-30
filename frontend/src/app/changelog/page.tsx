@@ -12,7 +12,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { Badge, Button, Panel, cx, type Tone } from '@/components/ui';
 import { ErrorState } from '@/components/StateView';
 import { useFetch } from '@/hooks/useFetch';
@@ -142,7 +142,7 @@ function UpdateCard({ item }: { item: ProductUpdateItem }) {
 
 function FeedbackPanel({ onClose, onSubmitted }: { onClose: () => void; onSubmitted: () => void }) {
   const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [myIssues, setMyIssues] = useState<IssueFeedbackItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +348,8 @@ function FeedbackPanel({ onClose, onSubmitted }: { onClose: () => void; onSubmit
 // ── Main page ───────────────────────────────────────────────────────────
 
 export default function ChangelogPage() {
-  const { currentUser, authLoading } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const authLoading = useAuthStore((state) => state.authLoading);
   const [showFeedback, setShowFeedback] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | ProductUpdateStatus>('all');
   const [versionQuery, setVersionQuery] = useState('');

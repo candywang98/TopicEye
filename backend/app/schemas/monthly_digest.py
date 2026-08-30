@@ -5,7 +5,9 @@ Monthly Digest schema — request/response models.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.schemas._normalizers import StrList
 
 
 class MonthlyDigestResponse(BaseModel):
@@ -16,7 +18,7 @@ class MonthlyDigestResponse(BaseModel):
     month_end: str
     overview: str | None = None
     takeaway: str | None = None
-    keywords: Any | None = None
+    keywords: StrList = Field(default_factory=list)
     trends: Any | None = None
     top_picks: Any | None = None
     category_summary: Any | None = None

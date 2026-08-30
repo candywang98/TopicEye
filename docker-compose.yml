@@ -4,16 +4,21 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8102:8000"
     volumes:
       - ./backend:/app
     environment:
       - APP_ENV=${APP_ENV:-development}
+      - LOCAL_NO_LOGIN_ENABLED=${LOCAL_NO_LOGIN_ENABLED:-true}
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://topiceye:topiceye@postgres:5432/topiceye}
+      - ANALYTICS_ENGINE=${ANALYTICS_ENGINE:-postgres}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - AUTO_CREATE_TABLES_ON_STARTUP=${AUTO_CREATE_TABLES_ON_STARTUP:-true}
       - CACHE_WARMUP_ENABLED=${CACHE_WARMUP_ENABLED:-true}
       - STARTUP_SEED_ENABLED=${STARTUP_SEED_ENABLED:-true}
+      - ADMIN_SEED_ENABLED=${ADMIN_SEED_ENABLED:-false}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-false}
+      - DUCKDB_STARTUP_INIT_ENABLED=${DUCKDB_STARTUP_INIT_ENABLED:-false}
       - DUCKDB_THREADS=${DUCKDB_THREADS:-2}
       - DUCKDB_MEMORY_LIMIT=${DUCKDB_MEMORY_LIMIT:-256MB}
       - DUCKDB_EXTENSION_DIR=${DUCKDB_EXTENSION_DIR:-./data/duckdb_extensions}
@@ -32,7 +37,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-topiceye}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-topiceye}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -43,17 +48,21 @@ services:
     restart: unless-stopped
 
   frontend:
+    profiles: ["docker-frontend"]
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - BACKEND_API_URL=http://backend:8000
-      # macOS bind mount 下 inotify 不穿透，强制 chokidar/webpack 轮询以启用 HMR
+      - DOCKER_FRONTEND=true
+      # Colima 默认 2GiB 环境下提前触发 GC，避免连续编译多个页面后由系统 OOM 杀进程
+      - NODE_OPTIONS=--max-old-space-size=512
+      # macOS bind mount 下 inotify 不穿透，保留文件轮询以启用 HMR
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     command: npm run dev

@@ -519,7 +519,7 @@ export default function StatsPage() {
   const days = 30;
 
   const { data: dashboard, loading, error, refetch } = useFetch(
-    () => statsApi.getDashboard(days),
+    (signal) => statsApi.getDashboard(days, { signal }),
     [days],
   );
 

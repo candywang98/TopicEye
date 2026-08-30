@@ -84,9 +84,11 @@ export function FavoritesProvider({
     });
   }
   const store = storeRef.current;
+  const initialCountsUserIdRef = useRef(authStore.getState().currentUser?.id ?? null);
 
-  // 读取 authLoading（用于控制初始化时机）
+  // 同时订阅 loading 与用户 identity，确保登录、登出及账号切换都会重新初始化收藏。
   const authLoading = useStore(authStore, (s) => s.authLoading);
+  const currentUserId = useStore(authStore, (s) => s.currentUser?.id ?? null);
 
   // 同步 pathname 到 store（refreshCounts 依赖它判断是否跳过 today-picks 计数）
   useEffect(() => {
@@ -112,12 +114,12 @@ export function FavoritesProvider({
 
     // SSR 已预取计数时，仅拉取完整收藏列表（更新 favorites Set / targetIds），
     // 跳过重复的计数请求。未预取时走原有 refreshCounts 全量拉取。
-    if (initialCounts) {
+    if (initialCounts && currentUser.id === initialCountsUserIdRef.current) {
       void store.getState()._loadFromIndex();
     } else {
       void store.getState().refreshCounts();
     }
-  }, [authLoading, authStore, store, initialCounts]);
+  }, [authLoading, currentUserId, authStore, store, initialCounts]);
 
   return (
     <FavoritesStoreContext.Provider value={store}>

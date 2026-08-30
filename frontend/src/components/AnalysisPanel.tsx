@@ -3,8 +3,13 @@
 import React, { useState } from 'react';
 import { BookOpen, Loader2, PenLine, Video, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useAppContext } from '@/components/ClientLayout';
+import { useAuthStore } from '@/providers/AppProvider';
 import { creationApi } from '@/lib/api';
+import {
+  extractCreatorAngles,
+  extractKeyPoints,
+  extractTitleSuggestions,
+} from '@/lib/utils';
 import { Button, Panel } from '@/components/ui';
 import type { ContentAnalysis } from '@/types';
 import CreationPlanDisplay from '@/components/CreationPlanDisplay';
@@ -19,8 +24,11 @@ interface AnalysisPanelProps {
 
 export default function AnalysisPanel({ analysis, onClose }: AnalysisPanelProps) {
   const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(true, onClose);
-  const { currentUser } = useAppContext();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const contentId = analysis.content_id || 0;
+  const keyPoints = extractKeyPoints(analysis);
+  const creatorAngles = extractCreatorAngles(analysis);
+  const titleSuggestions = extractTitleSuggestions(analysis);
   const [creationPlan, setCreationPlan] = useState<Record<string, unknown> | null>(null);
   const [generating, setGenerating] = useState(false);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
@@ -106,30 +114,30 @@ export default function AnalysisPanel({ analysis, onClose }: AnalysisPanelProps)
             <p className="text-[13px] leading-7 text-gray-600">{analysis.summary}</p>
           </div>
         )}
-        {analysis.key_points != null && analysis.key_points.length > 0 && (
+        {keyPoints.length > 0 && (
           <div className="mb-6">
             <h3 className="mb-2 text-[13px] font-semibold text-gray-700">核心观点</h3>
-            {analysis.key_points.map((point, i) => (
+            {keyPoints.map((point, i) => (
               <div key={i} className="mb-2 border-l-[3px] border-primary pl-3">
                 <span className="text-[13px] leading-6 text-gray-600">{point}</span>
               </div>
             ))}
           </div>
         )}
-        {analysis.creator_angles != null && analysis.creator_angles.length > 0 && (
+        {creatorAngles.length > 0 && (
           <div className="mb-6">
             <h3 className="mb-2 text-[13px] font-semibold text-gray-700">创作角度</h3>
-            {analysis.creator_angles.map((angle, i) => (
+            {creatorAngles.map((angle, i) => (
               <div key={i} className="mb-2 border-l-[3px] border-teal pl-3">
                 <span className="text-[13px] leading-6 text-gray-600">{angle}</span>
               </div>
             ))}
           </div>
         )}
-        {analysis.title_suggestions != null && analysis.title_suggestions.length > 0 && (
+        {titleSuggestions.length > 0 && (
           <div className="mb-6">
             <h3 className="mb-2 text-[13px] font-semibold text-gray-700">建议标题</h3>
-            {analysis.title_suggestions.map((title, i) => (
+            {titleSuggestions.map((title, i) => (
               <div key={i} className="mb-1.5 text-[13px] leading-7 text-gray-600">
                 <span className="font-semibold text-primary">{i + 1}.</span> {title}
               </div>
