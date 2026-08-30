@@ -168,11 +168,6 @@ export default function EvidenceDashboardPage() {
   const marked = effectStats?.marked;
   const unmarked = effectStats?.unmarked;
   const comparison = effectStats?.comparison || {};
-  const maxRate = Math.max(
-    marked?.interaction_rate || 0,
-    unmarked?.interaction_rate || 0,
-    0.01,
-  );
 
   // Per-type rates for bar chart
   const allTypes = new Set([

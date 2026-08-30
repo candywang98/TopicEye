@@ -1,30 +1,16 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ChevronDown,
-  CircleDot,
-  Flag,
-  Loader2,
-  RefreshCw,
-  Rocket,
-  ShieldCheck,
-  Wrench,
-  X,
-} from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
-import { Badge, Button, Panel, cx, type Tone } from '@/components/ui';
 import { ErrorState } from '@/components/StateView';
-import { useFetch } from '@/hooks/useFetch';
+import { Badge, Button, Panel, cx } from '@/components/ui';
 import { useDialogFocus } from '@/components/useDialogFocus';
+import { useFetch } from '@/hooks/useFetch';
 import {
   productFeedbackApi,
   type IssueFeedbackItem,
   type IssueFeedbackSeverity,
-  type IssueFeedbackStatus,
   type ProductUpdateItem,
   type ProductUpdateKind,
-  type ProductUpdateStatus,
+  type ProductUpdateStatus
 } from '@/lib/api';
 import { timeAgoShort as formatRelative } from '@/lib/datetime';
 import {
@@ -37,6 +23,19 @@ import {
   UPDATE_STATUS_LABELS,
   UPDATE_STATUS_TONES,
 } from '@/lib/product-feedback-labels';
+import { useAuthStore } from '@/providers/AppProvider';
+import {
+  ChevronDown,
+  CircleDot,
+  Flag,
+  Loader2,
+  RefreshCw,
+  Rocket,
+  ShieldCheck,
+  Wrench,
+  X,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
 // 注：Tone 类型与 product-feedback 标签映射已收敛到公共模块：
 // - Tone ← @/components/ui

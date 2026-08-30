@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { ArrowRight, Compass, HelpCircle, Lightbulb, Loader2, Target, X, Zap } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { creationApi } from '@/lib/api';
-import { Button, Panel, cx } from '@/components/ui';
 import CreationPlanDisplay, { type CreationPlan } from '@/components/CreationPlanDisplay';
+import { Button, cx } from '@/components/ui';
 import { useDialogFocus } from '@/components/useDialogFocus';
+import { creationApi } from '@/lib/api';
+import type { LucideIcon } from 'lucide-react';
+import { ArrowRight, Compass, HelpCircle, Lightbulb, Loader2, Target, X, Zap } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -203,7 +203,6 @@ export default function ExploreModeDialog({ contentId, onClose }: ExploreModeDia
 
   // ── Render ─────────────────────────────────────────────────────────
 
-  const isLoading = step === 'exploring' || step === 'converging';
   const selected = selectedIdx !== null ? assumptions[selectedIdx] : null;
 
   return (

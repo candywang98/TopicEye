@@ -95,7 +95,7 @@ export default function WeReadPage() {
     [],
   );
 
-  const allItems = data?.items ?? [];
+  const allItems = useMemo(() => data?.items ?? [], [data?.items]);
   const total = data?.total ?? 0;
 
   // 解析所有 items 的 WeRead 元数据

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Mail, Plus, Server, Settings, Trash2, Webhook } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
 import { settingsApi } from '@/lib/api';
 import type { EmailProviderConfig, NotificationWebhookConfig, WebhookItem, WebhookItemUpdate } from '@/lib/api/_analytics';
 import { NOTIFICATION_EVENT_TYPES } from '@/lib/api/_analytics';
@@ -39,7 +38,6 @@ const CONFIG_NOTES: Record<string, string[]> = {
 };
 
 export default function AdminSettingsPage() {
-  const currentUser = useAuthStore((state) => state.currentUser);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState<EmailProviderConfig | null>(null);

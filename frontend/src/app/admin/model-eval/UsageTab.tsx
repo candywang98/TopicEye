@@ -24,10 +24,12 @@ import {
   Gauge,
   KeyRound,
   Layers3,
+  Loader2,
   RefreshCw,
   SlidersHorizontal,
 } from 'lucide-react';
-import { EmptyState, LoadingState } from '@/components/StateView';
+import { EmptyState, ErrorState, LoadingState } from '@/components/StateView';
+import { AdminNoticeBanner } from '@/components/admin-ui';
 import { Button, Panel } from '@/components/ui';
 import type { ModelUsageSummary } from '@/lib/api';
 import {
@@ -40,16 +42,26 @@ import { InfoCell, StatTile, Surface } from './_components';
 export function UsageTab({
   usage,
   loading,
+  error,
   onRefresh,
 }: {
   usage: ModelUsageSummary | null;
   loading: boolean;
-  onRefresh: () => void;
+  error?: string | null;
+  onRefresh: () => void | Promise<void>;
 }) {
-  if (loading) {
+  if (loading && !usage) {
     return (
       <Surface title="用量统计" icon={BarChart3}>
-        <LoadingState minHeight="220px" />
+        <LoadingState label="正在汇总近 30 日用量…" minHeight="220px" />
+      </Surface>
+    );
+  }
+
+  if (error && !usage) {
+    return (
+      <Surface title="用量统计" icon={BarChart3}>
+        <ErrorState error={error} onRetry={() => void onRefresh()} />
       </Surface>
     );
   }
@@ -57,7 +69,7 @@ export function UsageTab({
   if (!usage) {
     return (
       <Surface title="用量统计" icon={BarChart3}>
-        <EmptyState panel={false} minHeight="220px" title="暂无用量数据" />
+        <EmptyState panel={false} minHeight="220px" icon={BarChart3} title="暂无用量数据" desc="模型产生调用记录后，这里会展示 Token、费用与成功率。" />
       </Surface>
     );
   }
@@ -67,6 +79,12 @@ export function UsageTab({
 
   return (
     <div className="flex flex-col gap-3.5">
+      {error && (
+        <AdminNoticeBanner tone="red">
+          用量数据未能更新，当前显示上一次成功加载的结果：{error}
+        </AdminNoticeBanner>
+      )}
+
       <Surface title="30 日用量概览" icon={BarChart3} hint={`自 ${usage.since.slice(0, 10)} 起`}>
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
           <StatTile icon={Gauge} label="总 Token" value={formatTokens(usage.total.tokens_total)} hint={`输入 ${formatTokens(usage.total.tokens_input)} · 输出 ${formatTokens(usage.total.tokens_output)}`} tone="purple" />
@@ -76,9 +94,9 @@ export function UsageTab({
           <StatTile icon={Clock3} label="平均耗时" value={`${usage.total.avg_duration_ms}ms`} hint={`成功率 ${(usage.total.success_rate * 100).toFixed(1)}%`} tone="amber" />
         </div>
         <div className="mt-3.5 flex justify-end">
-          <Button type="button" variant="secondary" onClick={onRefresh} className="text-primary">
-            <RefreshCw size={12} strokeWidth={2.2} />
-            刷新用量
+          <Button type="button" variant="secondary" onClick={() => void onRefresh()} disabled={loading} className="text-primary">
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={2.2} />}
+            {loading ? '刷新中' : '刷新用量'}
           </Button>
         </div>
       </Surface>

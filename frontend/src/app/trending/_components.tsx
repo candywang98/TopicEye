@@ -18,21 +18,7 @@
  * RESONANCE_COLORS / isWebnovelSource）来自 _trending-utils.ts。
  */
 
-import React, { useState } from 'react';
-import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
-  ExternalLink,
-  Lightbulb,
-  Star,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
 import { Panel, cx } from '@/components/ui';
-// PanelTitle / StatTile 已收敛到公共组件层，此处 re-export 保持调用方 import 路径不变。
-export { PanelTitle } from '@/components/ui';
-export { StatTile } from '@/components/StatTile';
 import {
   trendingApi,
   type CrossPlatformCluster,
@@ -40,13 +26,23 @@ import {
   type TrendingAngleRecommendation,
   type TrendingItem,
 } from '@/lib/api';
+import { useAuthStore } from '@/providers/AppProvider';
 import {
-  CATEGORY_COLORS,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ExternalLink,
+  Lightbulb
+} from 'lucide-react';
+import { useState } from 'react';
+import {
   RESONANCE_COLORS,
   SOURCE_LABELS,
-  TREND_ICONS,
-  isWebnovelSource,
+  TREND_ICONS
 } from './_trending-utils';
+// PanelTitle / StatTile 已收敛到公共组件层，此处 re-export 保持调用方 import 路径不变。
+export { StatTile } from '@/components/StatTile';
+export { PanelTitle } from '@/components/ui';
 
 export function WebnovelItemRow({ item, rank }: { item: TrendingItem; rank: number }) {
   const extra = (item.extra || {}) as Record<string, unknown>;

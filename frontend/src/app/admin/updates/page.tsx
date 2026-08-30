@@ -1,30 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import { ErrorState, LoadingState } from '@/components/StateView';
+import { AdminNoticeBanner, AdminPageHeader, AdminPageShell } from '@/components/admin-ui';
+import { Badge, Button, Panel, cx, type Tone } from '@/components/ui';
+import { useDialogFocus } from '@/components/useDialogFocus';
+import { useFetch } from '@/hooks/useFetch';
 import {
-  CheckCircle2,
-  CircleDot,
+  productFeedbackApi,
+  type ProductUpdateItem,
+  type ProductUpdateKind,
+  type ProductUpdateStatus
+} from '@/lib/api';
+import { useAuthStore } from '@/providers/AppProvider';
+import {
   Edit3,
   Loader2,
   Plus,
   RefreshCw,
   Rocket,
   Trash2,
-  X,
+  X
 } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
-import { Badge, Button, Panel, cx, type Tone } from '@/components/ui';
-import { ErrorState, LoadingState } from '@/components/StateView';
-import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
-import { useFetch } from '@/hooks/useFetch';
-import { useDialogFocus } from '@/components/useDialogFocus';
-import {
-  productFeedbackApi,
-  type ProductUpdateItem,
-  type ProductUpdateEntry,
-  type ProductUpdateKind,
-  type ProductUpdateStatus,
-} from '@/lib/api';
+import { useState } from 'react';
 
 const KIND_OPTIONS: { value: ProductUpdateKind; label: string; tone: 'teal' | 'primary' | 'purple' | 'amber' }[] = [
   { value: 'release', label: '发布', tone: 'teal' },
@@ -76,7 +73,6 @@ function fromDateInput(s: string): string | null {
 }
 
 export default function AdminUpdatesPage() {
-  const currentUser = useAuthStore((state) => state.currentUser);
   const authLoading = useAuthStore((state) => state.authLoading);
   const [statusFilter, setStatusFilter] = useState<'all' | ProductUpdateStatus>('all');
   const [versionQuery, setVersionQuery] = useState('');

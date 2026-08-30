@@ -66,7 +66,7 @@ export default function RelationGraph({ contentId, contentTitle, relations }: Re
       confidence: r.confidence,
     }))
   );
-  const [dimensions, setDimensions] = useState({ width: 480, height: 320 });
+  const [dimensions] = useState({ width: 480, height: 320 });
 
   // Build nodes from content + relations
   const buildNodes = useCallback(() => {

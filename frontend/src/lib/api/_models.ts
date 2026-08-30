@@ -3,8 +3,8 @@
  * Uses request from ./_core.
  */
 
+import type { EvalResult, EvalRun, LlmModelCreatePayload, LlmModelItem, LlmModelPresetCatalog, ModelUsageSummary } from '@/types/models';
 import { request } from './_core';
-import type { EvalResult, EvalRun, LlmModelCreatePayload, LlmModelItem, LlmModelPresetCatalog, LlmModelPresetItem, ModelUsageSummary } from '@/types/models';
 
 // ─── LLM Models API ───
 

@@ -24,8 +24,6 @@ import type { ApiTokenItem } from '@/lib/api';
 import type { IntegrationStatus, WeReadSyncResult } from '@/types';
 import { formatDateTime } from '@/lib/datetime';
 
-const DEFAULT_API_URL_PLACEHOLDER = 'https://weread.example.com/api';
-
 function formatTime(value?: string | null) {
   return value ? formatDateTime(value, true) : '尚未同步';
 }
@@ -55,18 +53,6 @@ function CopyCommandButton({ command, className }: { command: string; className?
     >
       {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
     </button>
-  );
-}
-
-function CommandRow({ label, command }: { label: string; command: string }) {
-  return (
-    <div className="grid gap-2 rounded-sm border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[116px_1fr_auto] sm:items-center">
-      <div className="text-xs font-black text-gray-500">{label}</div>
-      <code className="min-w-0 overflow-x-auto whitespace-nowrap rounded-xs bg-white px-2.5 py-2 font-mono text-xs font-bold text-gray-800">
-        {command}
-      </code>
-      <CopyCommandButton command={command} />
-    </div>
   );
 }
 

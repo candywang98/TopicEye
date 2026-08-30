@@ -20,6 +20,8 @@
 import React, { useState } from 'react';
 import {
   KeyRound,
+  Loader2,
+  Pencil,
   Plus,
   Power,
   Settings2,
@@ -27,38 +29,60 @@ import {
 } from 'lucide-react';
 import { Button, Panel, Toolbar, cx } from '@/components/ui';
 import { EmptyState } from '@/components/StateView';
+import { AdminNoticeBanner } from '@/components/admin-ui';
 import { InfoCell, StatusPill, Surface } from './_components';
 import { modelsApi } from '@/lib/api';
 import type { LlmModelItem } from '@/lib/api';
 import { formatPerMillion } from './_model-eval-utils';
 import { ModelEditForm } from './ModelEditForm';
 
-export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRefresh: () => void }) {
+export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRefresh: () => void | Promise<void> }) {
   const [editing, setEditing] = useState<LlmModelItem | null>(null);
   const [testing, setTesting] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<number, { status: string; response?: string; error?: string; duration_ms: number }>>({});
   const [showAdd, setShowAdd] = useState(false);
 
   const handleTest = async (id: number) => {
     setTesting(id);
+    setActionError(null);
     try {
       const res = await modelsApi.test(id);
       setTestResult((prev) => ({ ...prev, [id]: res }));
-    } catch (e: unknown) {
-      setTestResult((prev) => ({ ...prev, [id]: { status: 'failed', error: String(e), duration_ms: 0 } }));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '连接测试失败';
+      setTestResult((prev) => ({ ...prev, [id]: { status: 'failed', error: message, duration_ms: 0 } }));
+    } finally {
+      setTesting(null);
     }
-    setTesting(null);
   };
 
   const handleToggle = async (m: LlmModelItem) => {
-    await modelsApi.update(m.id, { enabled: !m.enabled });
-    onRefresh();
+    setUpdating(m.id);
+    setActionError(null);
+    try {
+      await modelsApi.update(m.id, { enabled: !m.enabled });
+      await onRefresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '模型状态更新失败');
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('确定删除该模型配置？')) return;
-    await modelsApi.delete(id);
-    onRefresh();
+    setUpdating(id);
+    setActionError(null);
+    try {
+      await modelsApi.delete(id);
+      await onRefresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '模型删除失败');
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const enabledCount = models.filter((m) => m.enabled).length;
@@ -78,11 +102,17 @@ export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRef
         </div>
       </Surface>
 
+      {actionError && (
+        <AdminNoticeBanner tone="red" onClose={() => setActionError(null)}>
+          {actionError}
+        </AdminNoticeBanner>
+      )}
+
       {showAdd && (
         <ModelEditForm
           onClose={(saved, createdId) => {
             setShowAdd(false);
-            onRefresh();
+            void onRefresh();
             if (saved && createdId) void handleTest(createdId);
           }}
         />
@@ -92,7 +122,7 @@ export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRef
           model={editing}
           onClose={() => {
             setEditing(null);
-            onRefresh();
+            void onRefresh();
           }}
         />
       )}
@@ -104,7 +134,7 @@ export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRef
             className={cx(
               'flex flex-col gap-3.5 p-4.5 transition',
               !m.enabled && 'opacity-60',
-              m.enabled && m.routing_priority <= 10 && 'border-primary-border shadow-[0_12px_28px_rgba(255,107,53,0.08)]',
+              m.enabled && m.routing_priority <= 10 && 'border-primary-border bg-primary-light/20',
             )}
           >
             <div className="flex items-start justify-between gap-3">
@@ -172,12 +202,19 @@ export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRef
             )}
 
             <Toolbar className="border-t border-gray-100 pt-3">
-              <Button type="button" variant="secondary" onClick={() => handleToggle(m)}>{m.enabled ? '禁用' : '启用'}</Button>
-              <Button type="button" variant="secondary" onClick={() => handleTest(m.id)} disabled={testing === m.id} className="text-primary">
-                {testing === m.id ? '测试中...' : '测试'}
+              <Button type="button" variant="secondary" onClick={() => void handleToggle(m)} disabled={updating === m.id}>
+                {updating === m.id ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />}
+                {m.enabled ? '禁用' : '启用'}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setEditing(m)}>编辑</Button>
-              <Button type="button" variant="danger" onClick={() => handleDelete(m.id)}>
+              <Button type="button" variant="secondary" onClick={() => void handleTest(m.id)} disabled={testing === m.id || updating === m.id} className="text-primary">
+                {testing === m.id && <Loader2 size={12} className="animate-spin" />}
+                {testing === m.id ? '测试中' : '测试'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setEditing(m)} disabled={updating === m.id}>
+                <Pencil size={12} />
+                编辑
+              </Button>
+              <Button type="button" variant="danger" onClick={() => void handleDelete(m.id)} disabled={updating === m.id}>
                 <Trash2 size={12} strokeWidth={2.2} />
                 删除
               </Button>
@@ -188,7 +225,14 @@ export function ModelsTab({ models, onRefresh }: { models: LlmModelItem[]; onRef
 
       {models.length === 0 && (
         <Surface title="空模型库" icon={Settings2}>
-          <EmptyState panel={false} minHeight="220px" title="还没有配置任何模型，点击“添加模型”开始" />
+          <EmptyState
+            panel={false}
+            minHeight="220px"
+            icon={Settings2}
+            title="还没有模型配置"
+            desc="添加第一个模型后，可以测试连接、设置路由并运行 A/B 测评。"
+            actions={[{ label: '添加模型', onClick: () => setShowAdd(true), variant: 'primary' }]}
+          />
         </Surface>
       )}
     </div>

@@ -240,7 +240,6 @@ export function LeadPick({
   onStartWorkflow,
   onRead,
   workflowPending,
-  evidenceMark,
 }: {
   item: ContentItem;
   isFav: boolean;
@@ -249,7 +248,6 @@ export function LeadPick({
   onStartWorkflow: (item: ContentItem, isFavorited: boolean) => void;
   onRead: (id: number) => void;
   workflowPending: boolean;
-  evidenceMark?: EvidenceMark | null;
 }) {
   const analysis = getAnalysis(item);
   const score = scoreOf(item);

@@ -65,7 +65,7 @@ export default function LowFollowerViralPage() {
     page_size: PAGE_SIZE,
   });
 
-  const items = data?.items ?? [];
+  const items = React.useMemo(() => data?.items ?? [], [data?.items]);
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const startItem = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;

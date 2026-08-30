@@ -1,6 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { Badge, Button, Panel, cx } from '@/components/ui';
+import {
+  trendingApi,
+  type CrossPlatformCluster,
+  type PersistentTopic,
+  type TrendingItem,
+  type TrendingSource
+} from '@/lib/api';
+import { isAbortError } from '@/lib/api/_core';
+import { timeAgoShort as formatTime } from '@/lib/datetime';
+import { useAuthStore } from '@/providers/AppProvider';
 import {
   Activity,
   BarChart3,
@@ -12,40 +23,22 @@ import {
   RefreshCw,
   Rss,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
-import { Badge, Button, Panel, cx } from '@/components/ui';
-import { EmptyState, LoadingState } from '@/components/StateView';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
-  AnglePanel,
   ClusterCard,
   PanelTitle,
-  ResonanceBadge,
-  SourceMiniItem,
   StatTile,
   TrendBadge,
-  WebnovelItemRow,
+  WebnovelItemRow
 } from './_components';
 import {
   CATEGORIES,
   CATEGORY_COLORS,
-  SOURCE_BRAND,
+  RESONANCE_COLORS,
   SOURCE_LABELS,
   isWebnovelSource,
-  sourceBrand,
-  RESONANCE_COLORS,
+  sourceBrand
 } from './_trending-utils';
-import {
-  trendingApi,
-  type TrendingItem,
-  type TrendingSource,
-  type TrendingAngleRecommendation,
-  type CrossPlatformCluster,
-  type CrossPlatformSourceItem,
-  type PersistentTopic,
-} from '@/lib/api';
-import { isAbortError } from '@/lib/api/_core';
-import { timeAgoShort as formatTime } from '@/lib/datetime';
 
 /* ── Constants ── */
 

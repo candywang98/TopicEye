@@ -9,15 +9,15 @@
  * 配置 + 工具函数来自 _sources-utils.ts。
  */
 
-import React, { useState } from 'react';
-import { Activity, GripVertical, Network, ShieldCheck, Star } from 'lucide-react';
-import { Badge, Button, Panel, cx } from '@/components/ui';
 import type { BackendSource } from '@/components/SourceRow';
+import { Badge, Button, Panel, cx } from '@/components/ui';
 import { getFavoriteTargetKey } from '@/lib/favorites';
 import { sourceTypeLabel } from '@/lib/source-sync-board';
 import { timeAgo } from '@/lib/utils';
-import type { SourceTierKey, DropTarget } from './_sources-utils';
-import { sourceTierMeta, getSourceTier } from './_sources-utils';
+import { Network, ShieldCheck, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import type { DropTarget, SourceTierKey } from './_sources-utils';
+import { getSourceTier, sourceTierMeta } from './_sources-utils';
 
 export function SourceMapView({
   sourceMap,

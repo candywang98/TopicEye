@@ -1,6 +1,28 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import { ErrorState, LoadingState } from '@/components/StateView';
+import { AdminNoticeBanner, AdminPageHeader, AdminPageShell } from '@/components/admin-ui';
+import { Badge, Button, Panel, Toolbar, cx, type Tone } from '@/components/ui';
+import { useFetch } from '@/hooks/useFetch';
+import {
+  productFeedbackApi,
+  type IssueFeedbackItem,
+  type IssueFeedbackSeverity,
+  type IssueFeedbackStatus,
+  type ProductUpdateItem,
+  type ProductUpdateStatus
+} from '@/lib/api';
+import { formatDate, formatDateTime as formatTime } from '@/lib/datetime';
+import {
+  ISSUE_STATUS_LABELS,
+  ISSUE_STATUS_TONES,
+  SEVERITY_LABELS,
+  SEVERITY_TONES,
+  UPDATE_KIND_LABELS,
+  UPDATE_STATUS_LABELS,
+  UPDATE_STATUS_TONES,
+} from '@/lib/product-feedback-labels';
+import { useAuthStore } from '@/providers/AppProvider';
 import {
   CheckCircle2,
   CircleDot,
@@ -15,30 +37,7 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
-import { Badge, Button, Panel, Toolbar, cx, type Tone } from '@/components/ui';
-import { ErrorState, LoadingState } from '@/components/StateView';
-import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
-import { useFetch } from '@/hooks/useFetch';
-import {
-  productFeedbackApi,
-  type IssueFeedbackItem,
-  type IssueFeedbackSeverity,
-  type IssueFeedbackStatus,
-  type ProductUpdateItem,
-  type ProductUpdateKind,
-  type ProductUpdateStatus,
-} from '@/lib/api';
-import { formatDateTime as formatTime, formatDate } from '@/lib/datetime';
-import {
-  ISSUE_STATUS_LABELS,
-  ISSUE_STATUS_TONES,
-  SEVERITY_LABELS,
-  SEVERITY_TONES,
-  UPDATE_KIND_LABELS,
-  UPDATE_STATUS_LABELS,
-  UPDATE_STATUS_TONES,
-} from '@/lib/product-feedback-labels';
+import React, { useMemo, useState } from 'react';
 
 // 注：Tone 类型与 product-feedback 标签映射已收敛到公共模块：
 // - Tone ← @/components/ui
@@ -214,7 +213,7 @@ export default function FeedbackPage() {
   const myIssues = data?.myIssues ?? [];
   const allIssues = data?.allIssues ?? [];
   const issueStats = data?.issueStats ?? { myOpen: 0, myFixed: 0, total: 0, open: 0, fixed: 0 };
-  const updates = data?.updates ?? [];
+  const updates = useMemo(() => data?.updates ?? [], [data?.updates]);
 
   const [issueForm, setIssueForm] = useState({
     title: '',

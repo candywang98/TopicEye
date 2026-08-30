@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useStore } from 'zustand';
 import {
@@ -74,16 +74,13 @@ export function FavoritesProvider({
   const pathname = usePathname();
   const authStore = useAuthStoreApi();
 
-  // per-instance store
-  const storeRef = useRef<FavoritesStore | null>(null);
-  if (!storeRef.current) {
-    storeRef.current = createFavoritesStore({
+  const [store] = useState(() =>
+    createFavoritesStore({
       authStore,
       router,
       initialCounts,
-    });
-  }
-  const store = storeRef.current;
+    }),
+  );
   const initialCountsUserIdRef = useRef(authStore.getState().currentUser?.id ?? null);
 
   // 同时订阅 loading 与用户 identity，确保登录、登出及账号切换都会重新初始化收藏。

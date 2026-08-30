@@ -73,7 +73,7 @@ export default function LoginPage() {
 
   const handleOauthLogin = (provider: 'google' | 'github') => {
     // 整页跳转到后端，后端 302 到 provider 授权页
-    window.location.href = authApi.oauthLoginUrl(provider);
+    window.location.assign(authApi.oauthLoginUrl(provider));
   };
 
   const handleSendCode = async () => {

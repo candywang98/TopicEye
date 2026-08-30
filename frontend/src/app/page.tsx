@@ -1,56 +1,42 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  BookOpen,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Clock3,
-  ExternalLink,
-  PenLine,
-  Star,
-  X,
-  ArrowUp,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
-import Header from '@/components/Header';
 import CategoryChip from '@/components/CategoryChip';
-import { Badge, Button, Panel, Toolbar, cx } from '@/components/ui';
-import { contentsApi, feedbackApi } from '@/lib/api';
-import { useQueryClient } from '@tanstack/react-query';
+import ContentAnalysisPanel from '@/components/ContentAnalysisPanel';
+import Header from '@/components/Header';
+import { Button, Toolbar, cx } from '@/components/ui';
 import { useContentCategoriesQuery, useContentsListQuery } from '@/hooks/queries/useContentQueries';
-import { queryKeys } from '@/lib/query-keys';
-import type { FeedbackType } from '@/lib/api';
 import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
-import type { ContentItem, ContentAnalysis, RecommendLevel } from '@/types';
+import { contentsApi } from '@/lib/api';
 import {
-  ContentTimeline,
-  EditorialItem,
-  Spinner,
-  TimelineSummary,
-  levelColor,
-} from './_components';
+  formatTimelineDate,
+  isToday,
+  parseUTC
+} from '@/lib/datetime';
+import { queryKeys } from '@/lib/query-keys';
+import { explainRecommendation } from '@/lib/recommendation';
+import { startContentWorkflow } from '@/lib/workflow';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
+import type { ContentAnalysis, ContentItem, PaginatedResponse, RecommendLevel } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RECOMMEND_FILTERS,
   TIME_RANGE_HOURS,
   formatShanghaiToday,
   getContentTime,
-  getItemTags,
-  normalizeTags,
+  getItemTags
 } from './_app-utils';
-import { explainRecommendation, getRecommendationReason } from '@/lib/recommendation';
-import ContentAnalysisPanel from '@/components/ContentAnalysisPanel';
-import { startContentWorkflow } from '@/lib/workflow';
 import {
-  parseUTC,
-  formatClock as formatTime,
-  timeAgo,
-  isToday,
-  formatTimelineDate,
-} from '@/lib/datetime';
+  ContentTimeline,
+  Spinner,
+  TimelineSummary
+} from './_components';
 
 const INITIAL_CONTENT_LIMIT = 40;
 const CONTENT_LOAD_STEP = 40;
@@ -124,7 +110,7 @@ export default function HomePage() {
     }
     try {
       await contentsApi.ignore(id);
-      queryClient.setQueryData(queryKeys.contents.list(contentParams), (current: typeof contentsQuery.data) => current ? {
+      queryClient.setQueryData(queryKeys.contents.list(contentParams), (current: PaginatedResponse<ContentItem> | undefined) => current ? {
         ...current,
         items: current.items.filter((item) => item.id !== id),
         total: Math.max(0, current.total - 1),
@@ -133,7 +119,7 @@ export default function HomePage() {
     } catch (err) {
       console.error('Ignore failed:', err);
     }
-  }, [contentParams, contentsQuery.data, currentUser, queryClient, refreshCounts, router]);
+  }, [contentParams, currentUser, queryClient, refreshCounts, router]);
 
   const tagOptions = useMemo(() => {
     const counts = new Map<string, number>();
@@ -167,7 +153,7 @@ export default function HomePage() {
       return tb - ta;
     });
     return result;
-  }, [items, activeCategory, activeRecommendLevel, activeTag, searchQuery]);
+  }, [items, activeCategory, activeRecommendLevel, activeTag]);
 
   const timelineGroups = useMemo(() => {
     const groups = new Map<string, Array<{ item: ContentItem; level: RecommendLevel }>>();

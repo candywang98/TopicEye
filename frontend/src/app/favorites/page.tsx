@@ -1,27 +1,14 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  Archive,
-  CheckSquare,
-  Filter,
-  Inbox,
-  RefreshCw,
-  Search,
-  Star,
-  Trash2,
-  Video,
-  X,
-} from 'lucide-react';
-import { creationApi, favoritesApi } from '@/lib/api';
-import { useFavoritesStore } from '@/providers/AppProvider';
-import { useQueryClient } from '@tanstack/react-query';
+import { type CreationPlan } from '@/components/CreationPlanDisplay';
+import { Button } from '@/components/ui';
 import { useFavoritesBoardQuery } from '@/hooks/queries/useFavoritesQueries';
+import { creationApi, favoritesApi } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
-import CreationPlanDisplay, { type CreationPlan } from '@/components/CreationPlanDisplay';
-import { Badge, Button, Panel, cx } from '@/components/ui';
+import { useFavoritesStore } from '@/providers/AppProvider';
 import type { FavoriteItem, FavoriteStatus, FavoriteTargetType } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BatchActionBar,
   BoardGrid,
@@ -32,19 +19,15 @@ import {
   HeaderStats,
 } from './_components';
 import {
-  STATUS_FLOW,
-  TYPE_OPTIONS,
-  STATUS_OPTIONS,
   CREATION_PLATFORMS,
   FAVORITES_PAGE_SIZE,
-  TYPE_LABEL,
-  TYPE_TONE,
-  STATUS_LABEL,
+  STATUS_FLOW,
+  TYPE_OPTIONS,
   getFavoriteTags,
+  getInitialFavoriteFilters,
   getSavedCreationPlans,
   parseTagInput,
-  withSavedCreationPlan,
-  getInitialFavoriteFilters,
+  withSavedCreationPlan
 } from './_favorites-utils';
 
 export default function FavoritesPage() {

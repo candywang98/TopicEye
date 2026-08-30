@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import { EmptyState, ErrorState, LoadingState } from '@/components/StateView';
+import { Badge, Button, Metric, Panel, PanelTitle, cx } from '@/components/ui';
+import { useFetch } from '@/hooks/useFetch';
+import { trendsApi, type TrendKeywordItem as KeywordItem, type TrendPoint } from '@/lib/api';
+import { CHART_COLORS } from '@/lib/design-tokens';
+import type { TrendEvidenceRequest } from '@/types/trends';
 import {
   Activity,
   ArrowDownRight,
@@ -16,14 +21,8 @@ import {
   Tags,
   Target,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { Badge, Button, Metric, Panel, PanelTitle, cx } from '@/components/ui';
-import { CHART_COLORS } from '@/lib/design-tokens';
-import { EmptyState, ErrorState, LoadingState } from '@/components/StateView';
+import React, { useCallback, useMemo, useState } from 'react';
 import TrendEvidenceDrawer from './TrendEvidenceDrawer';
-import { useFetch } from '@/hooks/useFetch';
-import { trendsApi, type TrendPoint, type TrendKeywordItem as KeywordItem } from '@/lib/api';
-import type { TrendEvidenceRequest } from '@/types/trends';
 
 interface TopicSeries {
   key: string;
@@ -486,7 +485,7 @@ export default function TrendsPage() {
     [days],
   );
 
-  const trends = data?.trends ?? [];
+  const trends = useMemo(() => data?.trends ?? [], [data?.trends]);
   const keywords = data?.keywords ?? [];
 
   const topicSeries = useMemo(() => buildTopicSeries(trends), [trends]);

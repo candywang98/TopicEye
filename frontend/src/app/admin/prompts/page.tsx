@@ -1,23 +1,22 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { AdminModal, AdminNoticeBanner, AdminPageHeader, AdminPageShell } from '@/components/admin-ui';
+import { Badge, Button, Panel, cx } from '@/components/ui';
+import type { PromptDetailResponse, PromptRegistryItem } from '@/lib/api';
+import { adminPromptsApi } from '@/lib/api';
+import { formatDateTime } from '@/lib/datetime';
+import { useAuthStore } from '@/providers/AppProvider';
 import {
-  ChevronLeft,
   Clock,
   Coins,
   FileCode2,
   Hash,
   Loader2,
   RefreshCw,
-  ScrollText,
+  ScrollText
 } from 'lucide-react';
-import { useAuthStore } from '@/providers/AppProvider';
-import { Badge, Button, Panel, cx } from '@/components/ui';
-import { AdminPageShell, AdminPageHeader, AdminNoticeBanner, AdminModal } from '@/components/admin-ui';
-import { LoadingState, EmptyState } from '@/components/StateView';
-import { adminPromptsApi } from '@/lib/api';
-import type { PromptRegistryItem, PromptDetailResponse } from '@/lib/api';
-import { formatDateTime } from '@/lib/datetime';
+import { useCallback, useEffect, useState } from 'react';
 
 const SCENE_FILTERS = ['', 'analysis', 'classification', 'creation_explore', 'creation_focus', 'creation_converge'];
 

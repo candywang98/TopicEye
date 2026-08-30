@@ -9,15 +9,14 @@
  * 留在 AuthProvider 组件中，store 只持有状态 + 纯 setter/action。
  */
 
-import { createStore } from 'zustand';
 import type { StoreApi } from 'zustand';
+import { createStore } from 'zustand';
 
 import {
   authApi,
   getAuthToken,
-  getAuthTokenExpiresAt,
   setAuthToken,
-  setAuthTokenExpiresAt,
+  setAuthTokenExpiresAt
 } from '@/lib/api';
 import type { AuthTokenResponse, AuthUser } from '@/types';
 

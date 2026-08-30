@@ -4,60 +4,77 @@
  */
 
 import type {
-  Source,
-  CreateSourceRequest,
-  UpdateSourceRequest,
-  ContentItem,
-  ContentAnalysis,
-  TopicFilterParams,
-  ContentFilterParams,
-  PaginatedResponse,
-  SyncResult,
-  TopicInfo,
-  FavoriteItem,
-  FavoriteStatus,
-  FavoriteTargetType,
-  MonthlyDigest,
-  MonthlyDigestListResponse,
-  MonthlyDigestMonthsResponse,
-  WeeklyDigest,
-  WeeklyDigestListResponse,
-  WeeklyDigestWeeksResponse,
   AuthTokenResponse,
   AuthUser,
+  ContentItem,
+  CreateSourceRequest,
   IntegrationStatus,
+  NotificationListResponse,
   PlanCatalogResponse,
-  WeReadSyncResult,
-  WeReadSearchResponse,
+  UpdateSourceRequest,
+  WeReadBestBookmarks,
   WeReadBookInfo,
   WeReadReadData,
-  WeReadBestBookmarks,
+  WeReadSearchResponse,
   WeReadShelfSync,
-  NotificationListResponse,
+  WeReadSyncResult
 } from '@/types';
-import type { FavoriteCreatePayload, FavoriteTargetState } from '@/lib/favorites';
-import type {
-  RSSHubInstance,
-  StatsOverview,
-  StatsSourceItem,
-  StatsCategoryItem,
-  StatsTrendItem,
-  StatsNovelPlatform,
-  StatsDashboard,
-  JobStatsByStatus,
-  JobStatsByJobKey,
-  JobStatsRecentFailure,
-  JobStatsResponse,
-} from '@/types/stats';
 import type {
   ContentCategoryItem,
-  ScoringFlowStage,
-  ScoringFlowSample,
-  ScoringFlowDiagnostics,
   ScoringFlowConfig,
+  ScoringFlowDiagnostics,
   ScoringFlowResponse,
+  ScoringFlowSample,
+  ScoringFlowStage,
   TopicGroupResponse,
 } from '@/types/contents';
+import type {
+  EvalResult,
+  EvalRun,
+  LlmModelCreatePayload,
+  LlmModelItem,
+  LlmModelPresetCatalog,
+  LlmModelPresetItem,
+  ModelUsageBucket,
+  ModelUsageByModel,
+  ModelUsageByPrompt,
+  ModelUsageSummary,
+} from '@/types/models';
+import type {
+  IssueFeedbackItem,
+  IssueFeedbackListResponse,
+  IssueFeedbackSeverity,
+  IssueFeedbackStatus,
+  ProductUpdateEntry,
+  ProductUpdateItem,
+  ProductUpdateKind,
+  ProductUpdateListResponse,
+  ProductUpdateStatus,
+} from '@/types/product-feedback';
+import type {
+  JobStatsByJobKey,
+  JobStatsByStatus,
+  JobStatsRecentFailure,
+  JobStatsResponse,
+  RSSHubInstance,
+  StatsCategoryItem,
+  StatsDashboard,
+  StatsNovelPlatform,
+  StatsOverview,
+  StatsSourceItem,
+  StatsTrendItem,
+} from '@/types/stats';
+import type {
+  ContentScoringResult,
+  CrossPlatformCluster,
+  CrossPlatformSourceItem,
+  MotherTopic,
+  MotherTopicMutation,
+  PersistentTopic,
+  TrendingAngleRecommendation,
+  TrendingItem,
+  TrendingSource,
+} from '@/types/trending';
 import type {
   TrendEvidenceCalculation,
   TrendEvidenceDailyCount,
@@ -72,135 +89,48 @@ import type {
   TrendProvenanceStatus,
 } from '@/types/trends';
 import type {
-  IssueFeedbackSeverity,
-  IssueFeedbackStatus,
-  ProductUpdateKind,
-  ProductUpdateStatus,
-  IssueFeedbackItem,
-  IssueFeedbackListResponse,
-  ProductUpdateEntry,
-  ProductUpdateItem,
-  ProductUpdateListResponse,
-} from '@/types/product-feedback';
-import type {
-  TrendingItem,
-  TrendingSource,
-  TrendingAngleRecommendation,
-  PersistentTopic,
-  CrossPlatformSourceItem,
-  CrossPlatformCluster,
-  MotherTopic,
-  MotherTopicMutation,
-  ContentScoringResult,
-} from '@/types/trending';
-import type {
-  FanqieCategory,
   FanqieBook,
-  WebnovelMovementItem,
-  WebnovelCategoryItem,
-  WebnovelWeeklyReport,
+  FanqieCategory,
   QimaoBook,
+  WebnovelCategoryItem,
+  WebnovelMovementItem,
+  WebnovelWeeklyReport,
   ZhihuAlbum,
   ZhihuCategory,
 } from '@/types/webnovel';
-import type {
-  LlmModelItem,
-  LlmModelPresetItem,
-  LlmModelPresetCatalog,
-  LlmModelCreatePayload,
-  EvalRun,
-  EvalResult,
-  ModelUsageBucket,
-  ModelUsageByModel,
-  ModelUsageByPrompt,
-  ModelUsageSummary,
-} from '@/types/models';
 
 export type { ContentItem, CreateSourceRequest, UpdateSourceRequest };
 export type FeedbackType = 'like' | 'dislike' | 'skip' | 'not_relevant' | 'outdated' | 'great_pick';
 // 统计类型 re-export 保持向后兼容（外部通过 @/lib/api 导入）
 export type {
-  RSSHubInstance,
-  StatsOverview,
-  StatsSourceItem,
-  StatsCategoryItem,
-  StatsTrendItem,
-  StatsNovelPlatform,
-  StatsDashboard,
-  JobStatsByStatus,
-  JobStatsByJobKey,
-  JobStatsRecentFailure,
-  JobStatsResponse,
-  ContentCategoryItem,
-  ScoringFlowStage,
-  ScoringFlowSample,
-  ScoringFlowDiagnostics,
-  ScoringFlowConfig,
-  ScoringFlowResponse,
-  TopicGroupResponse,
-  TrendPoint,
-  TrendKeywordItem,
-  TrendProvenanceStatus,
-  TrendEvidenceFilter,
-  TrendEvidenceRequest,
-  TrendEvidenceScope,
-  TrendEvidenceSummary,
-  TrendEvidenceCalculation,
-  TrendEvidenceDailyCount,
-  TrendEvidenceItem,
-  TrendEvidenceResponse,
-  IssueFeedbackSeverity,
-  IssueFeedbackStatus,
-  ProductUpdateKind,
-  ProductUpdateStatus,
-  IssueFeedbackItem,
-  IssueFeedbackListResponse,
-  ProductUpdateEntry,
-  ProductUpdateItem,
-  ProductUpdateListResponse,
-  TrendingItem,
-  TrendingSource,
-  TrendingAngleRecommendation,
-  PersistentTopic,
-  CrossPlatformSourceItem,
-  CrossPlatformCluster,
-  MotherTopic,
-  MotherTopicMutation,
-  ContentScoringResult,
-  FanqieCategory,
-  FanqieBook,
-  WebnovelMovementItem,
-  WebnovelCategoryItem,
-  WebnovelWeeklyReport,
-  QimaoBook,
-  ZhihuAlbum,
-  ZhihuCategory,
-  LlmModelItem,
-  LlmModelPresetItem,
-  LlmModelPresetCatalog,
-  LlmModelCreatePayload,
-  EvalRun,
-  EvalResult,
-  ModelUsageBucket,
+  ContentCategoryItem, ContentScoringResult, CrossPlatformCluster, CrossPlatformSourceItem, EvalResult, EvalRun, FanqieBook, FanqieCategory, IssueFeedbackItem,
+  IssueFeedbackListResponse, IssueFeedbackSeverity,
+  IssueFeedbackStatus, JobStatsByJobKey, JobStatsByStatus, JobStatsRecentFailure,
+  JobStatsResponse, LlmModelCreatePayload, LlmModelItem, LlmModelPresetCatalog, LlmModelPresetItem, ModelUsageBucket,
   ModelUsageByModel,
   ModelUsageByPrompt,
-  ModelUsageSummary,
+  ModelUsageSummary, MotherTopic,
+  MotherTopicMutation, PersistentTopic, ProductUpdateEntry,
+  ProductUpdateItem, ProductUpdateKind, ProductUpdateListResponse, ProductUpdateStatus, QimaoBook, RSSHubInstance, ScoringFlowConfig, ScoringFlowDiagnostics, ScoringFlowResponse, ScoringFlowSample, ScoringFlowStage, StatsCategoryItem, StatsDashboard, StatsNovelPlatform, StatsOverview,
+  StatsSourceItem, StatsTrendItem, TopicGroupResponse, TrendEvidenceCalculation,
+  TrendEvidenceDailyCount, TrendEvidenceFilter, TrendEvidenceItem, TrendEvidenceRequest, TrendEvidenceResponse, TrendEvidenceScope,
+  TrendEvidenceSummary, TrendKeywordItem, TrendPoint, TrendProvenanceStatus, TrendingAngleRecommendation, TrendingItem,
+  TrendingSource, WebnovelCategoryItem, WebnovelMovementItem, WebnovelWeeklyReport, ZhihuAlbum,
+  ZhihuCategory
 };
 
 // Core API infrastructure (request / token / error helpers) extracted to _core.ts
 import {
-  request,
-  getAuthToken,
-  setAuthToken,
-  getAuthTokenExpiresAt,
-  setAuthTokenExpiresAt,
-  formatApiErrorDetail,
-  assertUniqueIds,
-  chunkArray,
   BASE_URL,
   FAVORITE_STATE_BATCH_SIZE,
+  formatApiErrorDetail,
+  getAuthToken,
+  getAuthTokenExpiresAt,
+  request,
+  setAuthToken,
+  setAuthTokenExpiresAt
 } from './api/_core';
-export { getAuthToken, setAuthToken, getAuthTokenExpiresAt, setAuthTokenExpiresAt, formatApiErrorDetail, FAVORITE_STATE_BATCH_SIZE };
+export { FAVORITE_STATE_BATCH_SIZE, formatApiErrorDetail, getAuthToken, getAuthTokenExpiresAt, setAuthToken, setAuthTokenExpiresAt };
 
 // ─── Auth API ───
 
@@ -349,30 +279,20 @@ export const integrationsApi = {
 
 // Domain API objects extracted to lib/api/ submodules for module size.
 // Re-export for backward compat — `import { sourcesApi } from '@/lib/api'` still works.
-export { sourcesApi, contentsApi, contentCategoriesApi, favoritesApi, topicsApi, analysesApi, dailyReportApi, creationApi, viralApi, apiTokensApi, evidenceApi, contentEventsAdminApi } from './api/_domains';
+export type { UserCreatePayload, UserCreateResponse, UserListItem, UserListResponse, UserUpdatePayload } from '@/types/users';
+export { adminPromptsApi, feedbackApi, productFeedbackApi, scoringDashboardApi, settingsApi, statsApi, statsJobsApi, trendsApi } from './api/_analytics';
+export type { PromptDetailResponse, PromptRegistryItem, PromptRegistryListResponse, ScoringDashboardResponse, ScoringDashboardSummary } from './api/_analytics';
+export { monthlyDigestApi, weeklyDigestApi } from './api/_digests';
+export { analysesApi, apiTokensApi, contentCategoriesApi, contentEventsAdminApi, contentsApi, creationApi, dailyReportApi, evidenceApi, favoritesApi, sourcesApi, topicsApi, viralApi } from './api/_domains';
 export type {
-  SourceBatchImportItem,
-  ApiTokenItem,
-  EvidenceStats,
-  EvidenceEffectStats,
-  ContentEventRelation,
-  ContentEventReviewStatus,
-  ContentEventNormalizationMode,
-  ContentEventNormalizationScope,
-  ContentEventReviewItem,
-  ContentEventReviewListResponse,
-  ContentEventMutationResponse,
-  ContentEventNormalizeRequest,
-  ContentEventNormalizeResponse,
+  ApiTokenItem, ContentEventMutationResponse, ContentEventNormalizationMode,
+  ContentEventNormalizationScope, ContentEventNormalizeRequest,
+  ContentEventNormalizeResponse, ContentEventRelation, ContentEventReviewItem,
+  ContentEventReviewListResponse, ContentEventReviewStatus, EvidenceEffectStats, EvidenceStats, SourceBatchImportItem
 } from './api/_domains';
-export { settingsApi, statsApi, statsJobsApi, trendsApi, feedbackApi, productFeedbackApi, adminPromptsApi, scoringDashboardApi } from './api/_analytics';
-export type { PromptRegistryItem, PromptRegistryListResponse, PromptDetailResponse, ScoringDashboardSummary, ScoringDashboardResponse } from './api/_analytics';
-export { weeklyDigestApi, monthlyDigestApi } from './api/_digests';
-export { readRecordApi } from './api/_read-records';
-export type { ReadTargetType, ReadRecordReportPayload, ReadRecordResponse } from './api/_read-records';
-export { trendingApi } from './api/_trending';
-export { motherTopicsApi } from './api/_mother-topics';
-export { fanqieApi, webnovelReportsApi, qimaoApi, zhihuApi } from './api/_mother-topics';
 export { modelsApi } from './api/_models';
+export { fanqieApi, motherTopicsApi, qimaoApi, webnovelReportsApi, zhihuApi } from './api/_mother-topics';
+export { readRecordApi } from './api/_read-records';
+export type { ReadRecordReportPayload, ReadRecordResponse, ReadTargetType } from './api/_read-records';
+export { trendingApi } from './api/_trending';
 export { usersApi } from './api/_users';
-export type { UserListItem, UserListResponse, UserUpdatePayload, UserCreatePayload, UserCreateResponse } from '@/types/users';

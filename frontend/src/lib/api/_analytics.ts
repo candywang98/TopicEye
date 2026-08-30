@@ -3,16 +3,16 @@
  * Uses request from ./_core.
  */
 
-import { request } from './_core';
-export type FeedbackType = 'like' | 'dislike' | 'skip' | 'not_relevant' | 'outdated' | 'great_pick';
 import type { IssueFeedbackItem, IssueFeedbackListResponse, IssueFeedbackSeverity, IssueFeedbackStatus, ProductUpdateEntry, ProductUpdateItem, ProductUpdateKind, ProductUpdateListResponse, ProductUpdateStatus } from '@/types/product-feedback';
-import type { JobStatsByJobKey, JobStatsResponse, RSSHubInstance, StatsCategoryItem, StatsDashboard, StatsNovelPlatform, StatsOverview, StatsSourceItem, StatsTrendItem } from '@/types/stats';
+import type { JobStatsResponse, RSSHubInstance, StatsCategoryItem, StatsDashboard, StatsNovelPlatform, StatsOverview, StatsSourceItem, StatsTrendItem } from '@/types/stats';
 import type {
   TrendEvidenceFilter,
   TrendEvidenceResponse,
   TrendKeywordItem,
   TrendPoint,
 } from '@/types/trends';
+import { request } from './_core';
+export type FeedbackType = 'like' | 'dislike' | 'skip' | 'not_relevant' | 'outdated' | 'great_pick';
 
 /** 邮件 Provider 配置响应（api_key / smtp_password 脱敏） */
 export interface EmailProviderConfig {

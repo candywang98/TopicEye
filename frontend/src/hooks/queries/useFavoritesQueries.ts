@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
 import { favoritesApi } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
-import type { FavoriteItem, FavoriteStatus, FavoriteTargetType } from '@/types';
+import type { FavoriteStatus, FavoriteTargetType } from '@/types';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 export function useFavoritesBoardQuery(params: {
   target_type: FavoriteTargetType | '';

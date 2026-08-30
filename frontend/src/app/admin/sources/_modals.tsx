@@ -14,15 +14,14 @@
  * 同时删除与 AdminModal 重复的焦点管理代码。
  */
 
-import React from 'react';
-import { Upload } from 'lucide-react';
-import { Badge, Button, Panel } from '@/components/ui';
-import { AdminModal, AdminModalFooter } from '@/components/admin-ui';
 import SourceForm, { type FormState } from '@/components/SourceForm';
-import type { BackendSource } from '@/components/SourceRow';
-import { sourceTypeLabel } from '@/lib/source-sync-board';
-import type { SourceBatchImportItem } from '@/lib/api';
+import { AdminModal, AdminModalFooter } from '@/components/admin-ui';
+import { Badge, Button, Panel } from '@/components/ui';
 import { useDialogFocus } from '@/components/useDialogFocus';
+import type { SourceBatchImportItem } from '@/lib/api';
+import { sourceTypeLabel } from '@/lib/source-sync-board';
+import { Upload } from 'lucide-react';
+import React from 'react';
 
 export function AddSourceModal({
   form,

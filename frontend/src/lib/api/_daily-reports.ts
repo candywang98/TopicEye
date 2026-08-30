@@ -4,8 +4,8 @@
  * 从 _domains.ts 拆出。
  */
 
+import type { YesterdayTrackingData } from '@/types';
 import { request } from './_core';
-import type { PaginatedResponse, YesterdayTrackingData } from '@/types';
 
 export interface WebhookDeliveryLogItem {
   id: number;

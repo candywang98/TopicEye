@@ -4,11 +4,10 @@
  * 从 _domains.ts 拆出。
  */
 
-import { request } from './_core';
-import type { ContentAnalysis, PaginatedResponse, TopicInfo, TopicFilterParams, FavoriteItem, FavoriteStatus, FavoriteTargetType } from '@/types';
 import type { FavoriteCreatePayload, FavoriteTargetState } from '@/lib/favorites';
-import { assertUniqueIds, chunkArray, FAVORITE_STATE_BATCH_SIZE } from './_core';
+import type { ContentAnalysis, FavoriteItem, FavoriteStatus, FavoriteTargetType, PaginatedResponse, TopicFilterParams } from '@/types';
 import type { TopicGroupResponse } from '@/types/contents';
+import { FAVORITE_STATE_BATCH_SIZE, assertUniqueIds, chunkArray, request } from './_core';
 
 // ─── Favorites API ───
 

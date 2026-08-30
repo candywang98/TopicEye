@@ -46,7 +46,10 @@ export function useFetch<T>(
   const seqRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   const run = useCallback(async (): Promise<T | null> => {
     controllerRef.current?.abort();
@@ -73,6 +76,11 @@ export function useFetch<T>(
     }
   }, []);
 
+  const abortActiveRequest = useCallback(() => {
+    controllerRef.current?.abort();
+    seqRef.current += 1;
+  }, []);
+
   // deps 变化或 enabled 切换时自动获取
   useEffect(() => {
     if (!enabled) return;
@@ -82,11 +90,8 @@ export function useFetch<T>(
 
   // 卸载时使后续回调失效
   useEffect(() => {
-    return () => {
-      controllerRef.current?.abort();
-      seqRef.current++;
-    };
-  }, []);
+    return abortActiveRequest;
+  }, [abortActiveRequest]);
 
   return { data, loading, error, refetch: run, setData };
 }

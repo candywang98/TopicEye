@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Loader2, ShieldCheck, X } from 'lucide-react';
 import { useAuthStore } from '@/providers/AppProvider';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminTopBar from '@/components/AdminTopBar';
 import { Panel } from '@/components/ui';
+import { useDialogFocus } from '@/components/useDialogFocus';
 
 export default function AdminLayout({
   children,
@@ -16,10 +17,18 @@ export default function AdminLayout({
   const currentUser = useAuthStore((state) => state.currentUser);
   const authLoading = useAuthStore((state) => state.authLoading);
   const router = useRouter();
+  const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = () => setMobileNavOpen(false);
+  const { dialogRef, onKeyDown } = useDialogFocus<HTMLDivElement>(mobileNavOpen, closeMobileNav);
 
   useEffect(() => {
     if (!authLoading && !currentUser) router.replace('/login');
   }, [authLoading, currentUser, router]);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   // 加载中：显示骨架
   if (authLoading) {
@@ -72,9 +81,41 @@ export default function AdminLayout({
   // 管理员：渲染 admin 专属壳
   return (
     <div className="flex h-dvh overflow-hidden">
-      <AdminSidebar />
+      <AdminSidebar className="hidden lg:flex" />
+
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-[1000] lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={closeMobileNav}
+            aria-label="关闭管理导航"
+          />
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="管理后台导航"
+            tabIndex={-1}
+            onKeyDown={onKeyDown}
+            className="relative h-full w-[220px] shadow-xl"
+          >
+            <button
+              type="button"
+              onClick={closeMobileNav}
+              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              aria-label="关闭管理导航"
+              title="关闭管理导航"
+            >
+              <X size={17} />
+            </button>
+            <AdminSidebar className="h-full" onNavigate={closeMobileNav} />
+          </div>
+        </div>
+      )}
+
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-page">
-        <AdminTopBar />
+        <AdminTopBar onOpenNavigation={() => setMobileNavOpen(true)} />
         <div className="min-h-0 flex-1 overflow-auto">
           {children}
         </div>

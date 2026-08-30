@@ -1,41 +1,40 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import AnalysisPanel from '@/components/AnalysisPanel';
+import RadarSignature from '@/components/RadarSignature';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { Badge, Button } from '@/components/ui';
+import { usePicksEvidenceQuery, useTodayPicksQuery } from '@/hooks/queries/useContentQueries';
+import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
+import { contentsApi } from '@/lib/api';
+import { getRecommendLevelLabel } from '@/lib/utils';
+import { startContentWorkflow } from '@/lib/workflow';
+import { useAuthStore, useFavoritesStore, useReaderStore } from '@/providers/AppProvider';
+import type { ContentAnalysis, ContentItem, EvidenceMark } from '@/types';
 import {
   Columns3,
   FileText,
   List,
 } from 'lucide-react';
-import { contentsApi } from '@/lib/api';
-import type { EvidenceMark } from '@/types';
-import { useAuthStore, useFavoritesStore, useReaderStore } from '@/providers/AppProvider';
-import AnalysisPanel from '@/components/AnalysisPanel';
-import RadarSignature from '@/components/RadarSignature';
-import { Badge, Button, Panel, cx } from '@/components/ui';
-import { EmptyState, LoadingState } from '@/components/StateView';
-import { useContentFavoriteStates } from '@/hooks/useContentFavoriteStates';
-import { usePicksEvidenceQuery, useTodayPicksQuery } from '@/hooks/queries/useContentQueries';
-import { getRecommendLevelLabel } from '@/lib/utils';
-import { startContentWorkflow } from '@/lib/workflow';
-import type { ContentAnalysis, ContentItem, TopicInfo } from '@/types';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  RECOMMEND_LEVELS,
+  FilterPanel,
+  LeadPick,
+  OverviewStrip,
+  PickCard,
+  QualityPanel,
+  TopicBoard,
+} from './_components';
+import {
   DEFAULT_TIME_RANGE,
   INITIAL_PICK_LIMIT,
   PICK_LOAD_STEP,
-  normalizeTimeRange,
+  RECOMMEND_LEVELS,
   getAnalysis,
+  normalizeTimeRange,
   scoreOf,
 } from './_today-picks-utils';
-import {
-  OverviewStrip,
-  LeadPick,
-  FilterPanel,
-  QualityPanel,
-  TopicBoard,
-  PickCard,
-} from './_components';
 export default function TodayPicksPageWrapper() {
   return (
     <Suspense fallback={<div className="p-20 text-center text-sm text-gray-400">加载中...</div>}>
@@ -111,9 +110,9 @@ function TodayPicksPage() {
   const { data, isLoading: loading } = useTodayPicksQuery(picksParams);
 
   // 从 data 派生各状态
-  const items = data?.items || [];
+  const items = useMemo(() => data?.items || [], [data?.items]);
   const total = data?.total || 0;
-  const topics = data?.topics || [];
+  const topics = useMemo(() => data?.topics || [], [data?.topics]);
   const eventMemberCount = data?.event_members_hidden || 0;
 
   // 批量获取证据标记（避免每张卡片单独 API 调用 N+1）
@@ -277,7 +276,6 @@ function TodayPicksPage() {
               onStartWorkflow={handleStartWorkflow}
               onRead={handleRead}
               workflowPending={workflowPendingId === leadItem.id}
-              evidenceMark={evidenceMarks[String(leadItem.id)]}
             />
           )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useStore } from 'zustand';
 import { getAuthToken, getAuthTokenExpiresAt, setAuthToken, setAuthTokenExpiresAt, authApi, settingsApi } from '@/lib/api';
@@ -69,19 +69,17 @@ export function AuthProvider({
   const router = useRouter();
   const pathname = usePathname();
 
-  // per-instance store（useRef 保证 SSR 安全：每个请求/组件实例独立 store）
-  const storeRef = useRef<AuthStore | null>(null);
-  if (!storeRef.current) {
-    storeRef.current = createAuthStore({
+  // 惰性 state 保证每个 SSR 请求/组件实例只创建一个独立 store。
+  const [store] = useState(() =>
+    createAuthStore({
       user: initialUser,
       userResolved: initialUserResolved,
       featureFlags: initialFeatureFlags,
       featureFlagsResolved: initialFeatureFlagsResolved,
       localMode: initialLocalMode,
       localModeResolved: initialLocalModeResolved,
-    });
-  }
-  const store = storeRef.current;
+    }),
+  );
 
   // 读取响应式 state（用于路由守卫 effect）
   const authLoading = useStore(store, (s) => s.authLoading);
@@ -198,7 +196,7 @@ export function AuthProvider({
     }
     if (canAccessPath(pathname, currentUser, enabledFeatures)) return;
     router.replace(
-      requiredAccessForPath(pathname, enabledFeatures) === 'admin' && currentUser
+      requiredAccessForPath(pathname) === 'admin' && currentUser
         ? '/'
         : '/login',
     );

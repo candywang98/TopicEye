@@ -52,7 +52,13 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { id: 'settings', label: '系统设置', href: '/admin/settings', icon: Settings },
 ];
 
-export default function AdminSidebar() {
+export default function AdminSidebar({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -73,6 +79,7 @@ export default function AdminSidebar() {
   const navigate = (href: string) => {
     if (pendingHref) return;
     setNavigation({ href, fromPath: pathname });
+    onNavigate?.();
     startNavigation(() => router.push(href));
   };
 
@@ -88,7 +95,7 @@ export default function AdminSidebar() {
   };
 
   return (
-    <div className="relative flex h-screen shrink-0 select-none flex-col bg-slate-900 text-slate-300" style={{ width: 220 }}>
+    <div className={cx('relative flex h-dvh w-[220px] shrink-0 select-none flex-col bg-slate-900 text-slate-300', className)}>
       {/* Brand */}
       <div className="px-6 pb-6 pt-7">
         <div className="flex items-center gap-2.5">
@@ -135,8 +142,11 @@ export default function AdminSidebar() {
               onClick={() => {
                 if (item.href.startsWith('/dashboard')) {
                   window.open(item.href, '_blank');
+                  onNavigate?.();
                 } else if (!active) {
                   navigate(item.href);
+                } else {
+                  onNavigate?.();
                 }
               }}
               className={cx(

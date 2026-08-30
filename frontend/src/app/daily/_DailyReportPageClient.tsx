@@ -1,6 +1,20 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  PlatformHeading,
+  ReportActionButton,
+  ReportFooterStat,
+  ReportSectionTitle,
+  ReportStatusPanel,
+} from '@/components/ReportLayout';
+import type { SparklineData } from '@/components/Sparkline';
+import { Panel, cx } from '@/components/ui';
+import { useReadTracking } from '@/hooks/useReadTracking';
+import { dailyReportApi } from '@/lib/api';
+import { isAdmin } from '@/lib/navigation';
+import { queryKeys } from '@/lib/query-keys';
+import { useAuthStore, useReaderStore } from '@/providers/AppProvider';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BarChart3,
@@ -8,6 +22,7 @@ import {
   ChevronRight,
   FileText,
   Inbox,
+  KeyRound,
   ListChecks,
   Loader2,
   RefreshCw,
@@ -16,49 +31,30 @@ import {
   Smartphone,
   Target,
   TrendingUp,
-  KeyRound,
 } from 'lucide-react';
-import { Panel, cx } from '@/components/ui';
-import { useAuthStore, useReaderStore } from '@/providers/AppProvider';
-import { isAdmin } from '@/lib/navigation';
-import { dailyReportApi } from '@/lib/api';
-import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/query-keys';
-import { useReadTracking } from '@/hooks/useReadTracking';
-import YesterdayTracking from './_yesterday-tracking';
-import SelectedDrawer from './_selected-drawer';
-import type { SparklineData } from '@/components/Sparkline';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BriefPickRow, PickCard } from './_components';
 import {
-  PlatformHeading,
-  ReportActionButton,
-  ReportFooterStat,
-  ReportSectionTitle,
-  ReportStatusPanel,
-} from '@/components/ReportLayout';
-import { PickCard, BriefPickRow } from './_components';
-import {
-  type DailyReportData,
-  type DateSummary,
-  type CalendarDay,
-  type MarkAction,
-  type DailyPick,
-  EDITION_LABELS,
-  CATEGORY_ORDER,
   CATEGORY_EN,
-  localDateString,
+  type CalendarDay,
+  type DailyPick,
+  type DailyReportData,
+  EDITION_LABELS,
   formatDateTime,
-  parseJson,
-  pickKey,
-  marksMapFromResp,
   groupByCategory,
+  localDateString,
+  marksMapFromResp,
+  parseJson,
+  pickKey
 } from './_daily-utils';
+import SelectedDrawer from './_selected-drawer';
+import YesterdayTracking from './_yesterday-tracking';
 
 export default function DailyReportPageClient() {
   const queryClient = useQueryClient();
   const [report, setReport] = useState<DailyReportData | null>(null);
-  const [dates, setDates] = useState<DateSummary[]>([]);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
-  const [calendarStats, setCalendarStats] = useState({ done: 0, error: 0, missing: 0, generating: 0 });
+  const [, setCalendarStats] = useState({ done: 0, error: 0, missing: 0, generating: 0 });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   // T2: 'public' (default) | 'mine' — query-string controlled to keep diff small
   const [reportScope] = useState<'public' | 'mine'>(() => {
@@ -69,11 +65,10 @@ export default function DailyReportPageClient() {
     return 'public';
   });
   const [loading, setLoading] = useState(true);
-  const [datesLoading, setDatesLoading] = useState(true);
-  const [calendarLoading, setCalendarLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generatingDate, setGeneratingDate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [markError, setMarkError] = useState<string | null>(null);
   // 生成轮询代际：新一轮生成或组件卸载时自增，使旧的 5s 轮询循环
   // 在下一次醒来后直接退出，避免卸载后持续请求 / 交错 setState
   const generateSeqRef = useRef(0);
@@ -83,18 +78,11 @@ export default function DailyReportPageClient() {
   }, []);
 
   const refreshReportIndexes = useCallback(async () => {
-    const { datesData, calendarData } = await queryClient.fetchQuery({
+    const calendarData = await queryClient.fetchQuery({
       queryKey: [...queryKeys.daily.all, 'indexes', reportScope],
-      queryFn: async () => {
-        const [nextDates, nextCalendar] = await Promise.all([
-          reportScope === 'mine' ? dailyReportApi.listMyDates() : dailyReportApi.listDates(),
-          dailyReportApi.calendar(30),
-        ]);
-        return { datesData: nextDates, calendarData: nextCalendar };
-      },
+      queryFn: () => dailyReportApi.calendar(30),
       staleTime: 30_000,
     });
-    setDates(datesData.dates || []);
     setCalendarDays(calendarData.days || []);
     setCalendarStats({
       done: calendarData.done_count || 0,
@@ -106,14 +94,7 @@ export default function DailyReportPageClient() {
 
   useEffect(() => {
     (async () => {
-      try {
-        setDatesLoading(true);
-        setCalendarLoading(true);
-        await refreshReportIndexes();
-      } finally {
-        setDatesLoading(false);
-        setCalendarLoading(false);
-      }
+      await refreshReportIndexes();
     })();
   }, [refreshReportIndexes]);
 
@@ -194,11 +175,6 @@ export default function DailyReportPageClient() {
     fetchReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportScope]);
-
-  const handleDateSelect = useCallback((date: string) => {
-    if (date === selectedDate) return;
-    fetchReport(date);
-  }, [selectedDate, fetchReport]);
 
   const generateForDate = useCallback(async (date: string) => {
     const seq = ++generateSeqRef.current;
@@ -306,19 +282,8 @@ export default function DailyReportPageClient() {
     [report, pickMarks],
   );
 
-  const handleCalendarDayClick = (day: CalendarDay) => {
-    setSelectedDate(day.report_date);
-    if (day.has_report) {
-      fetchReport(day.report_date);
-      return;
-    }
-    setReport(null);
-    setError(`${day.report_date} 暂无日报，可手动补生成`);
-  };
-
   const keywords = parseJson(report?.keywords);
   const trends = parseJson(report?.trends);
-  const topPicks = parseJson(report?.top_picks);
   const platformTips = parseJson(report?.platform_tips);
 
   // todayStr 用 state 延迟到客户端渲染后计算，避免 SSR/CSR 跨天日期不一致导致 hydration mismatch。
@@ -330,9 +295,10 @@ export default function DailyReportPageClient() {
   const generatedAt = formatDateTime(report?.generated_at || report?.updated_at);
   const keywordList = Array.isArray(keywords) ? keywords as string[] : [];
   const trendList = Array.isArray(trends) ? trends as Array<{ title: string; desc: string; color?: string; momentum?: string }> : [];
-  const pickList = Array.isArray(topPicks)
-    ? topPicks as DailyPick[]
-    : [];
+  const pickList = useMemo(() => {
+    const parsed = parseJson(report?.top_picks);
+    return Array.isArray(parsed) ? parsed as DailyPick[] : [];
+  }, [report?.top_picks]);
   const platformTipEntries = platformTips && typeof platformTips === 'object'
     ? Object.entries(platformTips as Record<string, unknown>)
     : [];
@@ -342,8 +308,6 @@ export default function DailyReportPageClient() {
   const [showOriginalLang, setShowOriginalLang] = useState(false);
   // 今日已选抽屉开关（一期补行动闭环）
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // 标记失败的轻量内联提示（修掉原 handleMark 静默失败）
-  const [markError, setMarkError] = useState<string | null>(null);
   // 站内阅读：点选题卡片标题旁的 BookOpen 打开全局 ReaderDrawer（挂在 ClientLayout，全站单实例）
   const openReader = useReaderStore((state) => state.openReader);
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -379,7 +343,6 @@ export default function DailyReportPageClient() {
     report?.status === 'DONE' ? report.id : undefined,
   );
 
-  const generatedDates = useMemo(() => dates.filter((d) => d.report_date !== todayStr), [dates, todayStr]);
   const recoveryDays = calendarDays.filter((day) => day.status === 'MISSING' || day.status === 'ERROR');
 
   // 按 tier 分区，区内再按 category 分组。feature 优先展示（深度精讲），brief 次之（速览）。

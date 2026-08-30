@@ -1,6 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import { ErrorState } from '@/components/StateView';
+import { Badge, Button, Panel, Surface, cx } from '@/components/ui';
+import { useFetch } from '@/hooks/useFetch';
+import {
+  statsApi,
+  type StatsCategoryItem,
+  type StatsNovelPlatform,
+  type StatsSourceItem,
+  type StatsTrendItem
+} from '@/lib/api';
+import { timeAgoShort } from '@/lib/datetime';
+import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   BarChart3,
@@ -9,19 +20,7 @@ import {
   PieChart,
   RefreshCw,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { Badge, Button, Panel, PanelTitle, Surface, cx } from '@/components/ui';
-import { ErrorState, LoadingState } from '@/components/StateView';
-import { useFetch } from '@/hooks/useFetch';
-import {
-  statsApi,
-  type StatsOverview,
-  type StatsSourceItem,
-  type StatsCategoryItem,
-  type StatsTrendItem,
-  type StatsNovelPlatform,
-} from '@/lib/api';
-import { timeAgoShort } from '@/lib/datetime';
+import { useState } from 'react';
 
 // ── Color helpers ──────────────────────────────────────────────
 const BAR_COLORS = ['#FF6B35', '#00C9A7', '#D97706', '#2563EB', '#E11D48', '#059669', '#D97706', '#64748B'];
@@ -62,49 +61,6 @@ function MiniBar({ value, max, color, height = 8 }: { value: number; max: number
 // 公共版用 p-4.5 sm:p-5 + 自包含 header，视觉差异可接受。
 
 
-
-function HorizontalBarChart({
-  items,
-  valueKey,
-  labelKey,
-  extraKey,
-}: {
-  items: Array<Record<string, unknown>>;
-  valueKey: string;
-  labelKey: string;
-  extraKey?: string;
-}) {
-  if (!items || items.length === 0)
-    return <div className="py-3 text-[13px] text-gray-400">暂无数据</div>;
-
-  const maxVal = Math.max(...items.map(it => (it[valueKey] as number) || 0), 1);
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      {items.map((it, i) => {
-        const val = (it[valueKey] as number) || 0;
-        const label = (it[labelKey] as string) || '-';
-        const extra = extraKey ? (it[extraKey] as string | number | null) : null;
-        return (
-          <div key={i} className="flex items-center gap-2.5">
-            <div className="w-20 shrink-0 truncate text-right text-[13px] font-medium text-gray-700">
-              {label}
-            </div>
-            <div className="min-w-0 flex-1">
-              <MiniBar value={val} max={maxVal} color={barColor(i)} height={14} />
-            </div>
-            <div className="w-14 text-right font-mono text-xs text-gray-600">
-              {val}
-              {extra !== null && extra !== undefined && (
-                <span className="ml-1 text-[10px] text-gray-400">{extra}</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function SourcePieChart({ sources }: { sources: StatsSourceItem[] }) {
   if (sources.length === 0) {

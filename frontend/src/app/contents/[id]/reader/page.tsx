@@ -45,6 +45,7 @@ function ReaderBody({ blocks }: { blocks: ArticleReaderBlock[] }) {
       if (!block.src) return;
       rendered.push(
         <figure key={index} className="my-8">
+          {/* eslint-disable-next-line @next/next/no-img-element -- article images use arbitrary third-party hosts */}
           <img
             src={block.src}
             alt={block.alt ?? ''}

@@ -166,7 +166,7 @@ function navItemForPath(pathname: string): NavItem | undefined {
   return undefined;
 }
 
-export function requiredAccessForPath(pathname: string, enabledFeatures?: Record<string, boolean>): NavAccess {
+export function requiredAccessForPath(pathname: string): NavAccess {
   // feature 关闭的路径直接返回 'user'（让守卫把已登录用户踢回首页，未登录去登录页）
   // 这里返回 user 是为了让 canAccessPath 的 fallthrough 逻辑处理，真正的拦截在 canAccessPath
   if (PUBLIC_PATHS.some((href) => matchesPath(pathname, href))) return 'public';
@@ -180,7 +180,7 @@ export function canAccessPath(pathname: string, user: AuthUser | null, enabledFe
   const item = navItemForPath(pathname);
   if (item && !isFeatureEnabled(item.feature, enabledFeatures)) return false;
 
-  const access = requiredAccessForPath(pathname, enabledFeatures);
+  const access = requiredAccessForPath(pathname);
   if (access === 'public') return true;
   if (access === 'admin') return isAdmin(user);
   return Boolean(user);

@@ -18,7 +18,19 @@
  * normalizeTags / getItemTags / formatShanghaiToday）来自 _app-utils.ts。
  */
 
-import React, { useCallback, useState } from 'react';
+import SourceBadge from '@/components/SourceBadge';
+import { Badge, Button, Panel, cx } from '@/components/ui';
+import type { FeedbackType } from '@/lib/api';
+import { feedbackApi } from '@/lib/api';
+import { timeAgo } from '@/lib/datetime';
+import { explainRecommendation, getRecommendationReason } from '@/lib/recommendation';
+import { useAuthStore, useReaderStore } from '@/providers/AppProvider';
+import type {
+  ContentAnalysis,
+  ContentItem,
+  RecommendLevel,
+} from '@/types';
+import type { LucideIcon } from 'lucide-react';
 import {
   Ban,
   BookOpen,
@@ -26,27 +38,14 @@ import {
   Clock3,
   ExternalLink,
   Eye,
-  Flame,
   PenLine,
   Star,
   ThumbsDown,
   ThumbsUp,
-  X,
+  X
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore, useReaderStore } from '@/providers/AppProvider';
-import SourceBadge from '@/components/SourceBadge';
-import { Badge, Button, Panel, cx } from '@/components/ui';
-import { feedbackApi } from '@/lib/api';
-import type { FeedbackType } from '@/lib/api';
-import { timeAgo } from '@/lib/datetime';
-import { getRecommendationReason, explainRecommendation } from '@/lib/recommendation';
-import type {
-  ContentAnalysis,
-  ContentItem,
-  RecommendLevel,
-} from '@/types';
+import React, { useCallback, useState } from 'react';
 import { getContentTime, getItemTags } from './_app-utils';
 
 /* ── Color mapping for recommend levels (timeline dots + summary) ── */

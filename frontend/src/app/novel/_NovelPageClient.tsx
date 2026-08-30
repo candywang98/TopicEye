@@ -1,84 +1,64 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  ArrowDown,
-  ArrowUp,
-  BookOpen,
-  CheckCircle2,
-  Crown,
-  ExternalLink,
-  Filter,
-  Library,
-  LineChart,
-  RefreshCw,
-  Search,
-  Sparkles,
-  Star,
-  TrendingUp,
-  X,
-} from 'lucide-react';
-import { Button, Panel, cx } from '@/components/ui';
 import { EmptyState, LoadingState } from '@/components/StateView';
-import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
+import { Panel, cx } from '@/components/ui';
 import {
-  favoritesApi,
   fanqieApi,
+  favoritesApi,
   qimaoApi,
   trendingApi,
   webnovelReportsApi,
   zhihuApi,
-  type FanqieCategory,
   type FanqieBook,
+  type FanqieCategory,
   type QimaoBook,
-  type WebnovelMovementItem,
-  type WebnovelWeeklyReport,
-  type ZhihuAlbum,
   type TrendingItem,
+  type WebnovelWeeklyReport,
+  type ZhihuAlbum
 } from '@/lib/api';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
 import {
-  type Platform,
-  type BookItem,
-  type ViewMode,
-  type BookFavoriteMeta,
-  PLATFORM_META,
+  BookOpen,
+  Crown,
+  Filter,
+  Library,
+  RefreshCw,
+  Search,
+  Sparkles,
+  TrendingUp,
+  X
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BookCard,
+  FilterChip,
+  FilterGroup,
+  SummaryTile,
+  WebnovelCard,
+  WebnovelWeeklyPanel
+} from './_components';
+import {
   GROUP_LABELS,
-  RANK_TYPE_LABELS,
-  QIMAO_RANK_LABELS,
+  HEIYAN_HOME_SHELF_LABELS,
+  HEIYAN_SORT_FALLBACK,
+  HEIYAN_SORT_STYLE,
   ISHUGUI_RANK_LABELS,
   ISHUGUI_SHELF_TO_RANK,
-  HEIYAN_SORT_STYLE,
-  HEIYAN_SORT_FALLBACK,
-  HEIYAN_HOME_SHELF_LABELS,
-  HEIYAN_TYPE_STYLE,
+  PLATFORM_META,
   QIMAO_CHANNEL_LABELS,
+  QIMAO_RANK_LABELS,
+  RANK_TYPE_LABELS,
   ZHIHU_SORT_LABELS,
   ZHIHU_SUBCATS,
-  formatCount,
-  getItemTitle,
-  getItemAuthor,
-  getItemAbstract,
-  getItemCover,
-  getItemUrl,
-  getPositionChange,
-  getBookStableId,
   getBookFavoriteMeta,
-  chipStyle,
-  formatDate,
+  getItemAbstract,
+  getItemAuthor,
+  getItemTitle,
+  getPositionChange,
+  type BookItem,
+  type Platform,
+  type ViewMode
 } from './_novel-utils';
-import {
-  MetricPill,
-  MovementBadge,
-  MovementList,
-  WebnovelWeeklyPanel,
-  WebnovelCard,
-  BookCard,
-  FilterGroup,
-  SummaryMetric,
-  MiniMetric,
-  FilterChip,
-  SummaryTile,
-} from './_components';
 
 export default function NovelPageClient() {
   const currentUser = useAuthStore((state) => state.currentUser);

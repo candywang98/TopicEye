@@ -57,13 +57,14 @@ import {
 const MODAL_BODY_MAX_HEIGHT = 'calc(100dvh - 230px)';
 /** 弹窗宽度：兼顾预设卡片双列排布与表单字段密度 */
 const MODAL_MAX_WIDTH = 720;
+const DEFAULT_PRESET_KEY = 'deepseek_balanced';
 
 export function ModelEditForm({ model, onClose }: { model?: LlmModelItem | null; onClose: (saved?: boolean, createdId?: number) => void }) {
   const isEdit = !!model;
   const initialPreset = PROVIDER_PRESETS[model?.provider || 'openai'] || PROVIDER_PRESETS.openai;
   const [catalog, setCatalog] = useState<LlmModelPresetCatalog | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(!isEdit);
-  const [presetKey, setPresetKey] = useState('deepseek_balanced');
+  const [presetKey, setPresetKey] = useState(DEFAULT_PRESET_KEY);
   const [showAdvanced, setShowAdvanced] = useState(isEdit);
   const [form, setForm] = useState({
     name: model?.name || '',
@@ -163,7 +164,9 @@ export function ModelEditForm({ model, onClose }: { model?: LlmModelItem | null;
       .then((res) => {
         if (cancelled) return;
         setCatalog(res);
-        const nextKey = res.presets.some((item) => item.key === presetKey) ? presetKey : res.presets[0]?.key || 'custom';
+        const nextKey = res.presets.some((item) => item.key === DEFAULT_PRESET_KEY)
+          ? DEFAULT_PRESET_KEY
+          : res.presets[0]?.key || 'custom';
         applyPreset(nextKey, res);
       })
       .catch((e) => {

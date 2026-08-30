@@ -1,33 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Activity, FileSearch, List, Network, Plus, Star, Upload } from 'lucide-react';
-import { favoritesApi, sourcesApi, settingsApi } from '@/lib/api';
-import type { RSSHubInstance, CreateSourceRequest, SourceBatchImportItem, UpdateSourceRequest } from '@/lib/api';
-import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
-import { timeAgo } from '@/lib/utils';
-import { Badge, Button, Panel, Toolbar, cx } from '@/components/ui';
-import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
-import SourceForm, { FormState, emptyForm } from '@/components/SourceForm';
-import SourceRowComponent, { type BackendSource } from '@/components/SourceRow';
-import { Spinner } from '@/components/SourceRow';
+import { FormState, emptyForm } from '@/components/SourceForm';
+import { type BackendSource } from '@/components/SourceRow';
 import SourceSyncBoard from '@/components/SourceSyncBoard';
-import { buildSourceSyncBoard, sourceTypeLabel } from '@/lib/source-sync-board';
+import { AdminNoticeBanner, AdminPageHeader, AdminPageShell } from '@/components/admin-ui';
+import { Button, Toolbar, cx } from '@/components/ui';
+import type { CreateSourceRequest, RSSHubInstance, SourceBatchImportItem, UpdateSourceRequest } from '@/lib/api';
+import { favoritesApi, settingsApi, sourcesApi } from '@/lib/api';
 import { getFavoriteTargetKey } from '@/lib/favorites';
+import { buildSourceSyncBoard, sourceTypeLabel } from '@/lib/source-sync-board';
+import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
+import { Activity, FileSearch, List, Network, Plus, Upload } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type SourceTierKey,
-  type DropTarget,
-  sourceTierMeta,
   getSourceTier,
   normalizeRsshubInstanceUrl,
-  isPlainObject,
-  validateApiSourceConfig,
+  validateApiSourceConfig
 } from './_sources-utils';
 
-import { SourceMapCard, SourceMapView } from './_components';
-import { AddSourceModal, BatchImportModal, EditSourceModal } from './_modals';
 import { EvidenceProfileModal } from '@/components/EvidenceProfileModal';
-import { RSSHubManager, SourceListPanel, FeatureFlagsPanel } from './_panels';
+import { SourceMapView } from './_components';
+import { AddSourceModal, BatchImportModal, EditSourceModal } from './_modals';
+import { FeatureFlagsPanel, RSSHubManager, SourceListPanel } from './_panels';
 
 // ─── Page Component ───
 

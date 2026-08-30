@@ -18,7 +18,9 @@
  * 静态配置 + 工具函数来自 _novel-utils.ts。
  */
 
-import React, { useEffect, useState } from 'react';
+import { EmptyState, LoadingState } from '@/components/StateView';
+import { Button, Panel, cx } from '@/components/ui';
+import type { TrendingItem, WebnovelMovementItem, WebnovelWeeklyReport } from '@/lib/api';
 import {
   ArrowDown,
   ArrowUp,
@@ -26,45 +28,27 @@ import {
   CheckCircle2,
   Crown,
   ExternalLink,
-  Filter,
   LineChart,
   RefreshCw,
-  Search,
   Sparkles,
-  Star,
-  TrendingUp,
-  X,
+  Star
 } from 'lucide-react';
-import { Button, Panel, cx } from '@/components/ui';
-import { EmptyState, LoadingState } from '@/components/StateView';
-import type { TrendingItem, WebnovelMovementItem, WebnovelWeeklyReport } from '@/lib/api';
+import React, { useEffect, useState } from 'react';
 import {
-  type Platform,
   type BookItem,
   PLATFORM_META,
+  type Platform,
+  RANK_TYPE_LABELS,
+  ZHIHU_SORT_LABELS,
+  chipStyle,
   formatCount,
   formatDate,
-  getItemTitle,
-  getItemAuthor,
   getItemAbstract,
+  getItemAuthor,
   getItemCover,
+  getItemTitle,
   getItemUrl,
-  getPositionChange,
-  getBookStableId,
-  getBookFavoriteMeta,
-  chipStyle,
-  GROUP_LABELS,
-  RANK_TYPE_LABELS,
-  QIMAO_RANK_LABELS,
-  QIMAO_CHANNEL_LABELS,
-  ZHIHU_SORT_LABELS,
-  ZHIHU_SUBCATS,
-  ISHUGUI_RANK_LABELS,
-  ISHUGUI_SHELF_TO_RANK,
-  HEIYAN_SORT_STYLE,
-  HEIYAN_SORT_FALLBACK,
-  HEIYAN_HOME_SHELF_LABELS,
-  HEIYAN_TYPE_STYLE,
+  getPositionChange
 } from './_novel-utils';
 
 export function MetricPill({ children, color = '#6B7280', bg = '#F3F4F6' }: { children: React.ReactNode; color?: string; bg?: string }) {
@@ -280,6 +264,7 @@ export function WebnovelCard({ item, platform }: { item: TrendingItem; platform:
         className="relative h-[100px] w-[68px] shrink-0 overflow-hidden rounded-xs bg-gray-100"
       >
         {item.cover_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- cover hosts vary by source platform
           <img src={item.cover_url} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">无封面</div>
