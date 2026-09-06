@@ -16,7 +16,6 @@ import React from 'react';
 import {
   AlertCircle,
   Archive,
-  BookOpen,
   CheckSquare,
   ExternalLink,
   FileText,
@@ -456,15 +455,6 @@ export function FavoriteCard({
           >
             <FileText size={13} />
             详情
-          </a>
-        )}
-        {item.target_type === 'book' && (
-          <a
-            href="/novel"
-            className="inline-flex h-8 items-center gap-1 rounded-sm border border-gray-200 bg-white px-2 text-xs font-bold text-gray-500 hover:text-primary"
-          >
-            <BookOpen size={13} />
-            榜单
           </a>
         )}
         {item.target_type === 'source' && (

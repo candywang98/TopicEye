@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Activity, FileSearch, List, Network, Plus, Star, Upload } from 'lucide-react';
 import { favoritesApi, sourcesApi, settingsApi } from '@/lib/api';
 import type { RSSHubInstance, CreateSourceRequest, SourceBatchImportItem, UpdateSourceRequest } from '@/lib/api';
-import { useAuthStore, useFavoritesStore } from '@/providers/AppProvider';
+import { useFavoritesStore } from '@/providers/AppProvider';
 import { timeAgo } from '@/lib/utils';
 import { Badge, Button, Panel, Toolbar, cx } from '@/components/ui';
 import { AdminPageShell, AdminPageHeader, AdminNoticeBanner } from '@/components/admin-ui';
@@ -27,13 +27,11 @@ import {
 import { SourceMapCard, SourceMapView } from './_components';
 import { AddSourceModal, BatchImportModal, EditSourceModal } from './_modals';
 import { EvidenceProfileModal } from '@/components/EvidenceProfileModal';
-import { RSSHubManager, SourceListPanel, FeatureFlagsPanel } from './_panels';
+import { RSSHubManager, SourceListPanel } from './_panels';
 
 // ─── Page Component ───
 
 export default function SourcesPageClient() {
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const updateEnabledFeatures = useAuthStore((state) => state.updateEnabledFeatures);
   const favoriteTargets = useFavoritesStore((state) => state.favoriteTargets);
   const favoriteTargetPendingKeys = useFavoritesStore((state) => state.favoriteTargetPendingKeys);
   const toggleFavoriteTarget = useFavoritesStore((state) => state.toggleFavoriteTarget);
@@ -927,7 +925,6 @@ export default function SourcesPageClient() {
             onDelete={deleteInstance}
             onAdd={addInstance}
           />
-          {currentUser?.role === 'admin' && <FeatureFlagsPanel onUpdate={updateEnabledFeatures} />}
           <SourceListPanel
             loading={loading}
             sources={sources}

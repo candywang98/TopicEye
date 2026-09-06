@@ -47,11 +47,6 @@ describe('canAccessNavItem', () => {
     expect(canAccessNavItem(adminConsole, adminUser)).toBe(true);
   });
 
-  it('feature 未开启时即便是管理员也不可见', () => {
-    const fanqie = itemById('fanqie'); // feature: webnovel_module
-    expect(canAccessNavItem(fanqie, adminUser)).toBe(false);
-    expect(canAccessNavItem(fanqie, adminUser, { webnovel_module: true })).toBe(true);
-  });
 });
 
 describe('requiredAccessForPath', () => {
@@ -80,9 +75,9 @@ describe('canAccessPath', () => {
     expect(canAccessPath('/admin', adminUser)).toBe(true);
   });
 
-  it('feature 未开启的路径被守卫拦截', () => {
+  it('已移除的网文雷达路径始终被拦截', () => {
     expect(canAccessPath('/novel', normalUser)).toBe(false);
-    expect(canAccessPath('/novel', normalUser, { webnovel_module: true })).toBe(true);
+    expect(canAccessPath('/novel', normalUser, { webnovel_module: true })).toBe(false);
   });
 
   it('子路径按前缀匹配（/admin/sources/xxx 视为 /admin/sources）', () => {
@@ -104,11 +99,9 @@ describe('visibleNavSpaces', () => {
     expect(ids).toContain('manage');
   });
 
-  it('feature 开关控制受限项是否出现', () => {
-    const createOff = visibleNavSpaces(adminUser).find((s) => s.id === 'create');
-    expect(createOff?.items.some((i) => i.id === 'fanqie')).toBe(false);
-    const createOn = visibleNavSpaces(adminUser, { webnovel_module: true }).find((s) => s.id === 'create');
-    expect(createOn?.items.some((i) => i.id === 'fanqie')).toBe(true);
+  it('不再展示网文雷达入口', () => {
+    const create = visibleNavSpaces(adminUser, { webnovel_module: true }).find((s) => s.id === 'create');
+    expect(create?.items.some((i) => i.href === '/novel')).toBe(false);
   });
 });
 

@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  BookOpen,
   Bookmark,
   Library,
   Rocket,
@@ -75,7 +74,6 @@ export const NAV_SPACES: NavSpace[] = [
       { id: 'my-topics', label: '我的母题', href: '/my-topics', icon: Crosshair, access: 'user' },
       { id: 'favorites', label: '收藏夹', href: '/favorites', icon: Bookmark, access: 'user', countKey: 'favorites' },
       { id: 'algorithm', label: '算法流程', href: '/algorithm', icon: GitBranch, access: 'user' },
-      { id: 'fanqie', label: '网文雷达', href: '/novel', icon: BookOpen, access: 'user', feature: 'webnovel_module' },
       { id: 'weread', label: '微信读书', href: '/weread', icon: Library, access: 'user' },
     ],
   },
@@ -111,6 +109,7 @@ const EXTRA_ADMIN_ONLY_PATHS = [
 // 显式声明的公开路径（未登录可访问）。OAuth 回调页必须在此列，
 // 否则未登录态进来会被路由守卫踢去 /login，丢失 URL fragment 里的 token。
 const PUBLIC_PATHS = ['/login', '/oauth/callback'];
+const REMOVED_PATHS = ['/novel'];
 
 function uniquePaths(paths: string[]): string[] {
   return Array.from(new Set(paths));
@@ -166,7 +165,8 @@ function navItemForPath(pathname: string): NavItem | undefined {
   return undefined;
 }
 
-export function requiredAccessForPath(pathname: string, enabledFeatures?: Record<string, boolean>): NavAccess {
+export function requiredAccessForPath(pathname: string, _enabledFeatures?: Record<string, boolean>): NavAccess {
+  void _enabledFeatures;
   // feature 关闭的路径直接返回 'user'（让守卫把已登录用户踢回首页，未登录去登录页）
   // 这里返回 user 是为了让 canAccessPath 的 fallthrough 逻辑处理，真正的拦截在 canAccessPath
   if (PUBLIC_PATHS.some((href) => matchesPath(pathname, href))) return 'public';
@@ -176,6 +176,8 @@ export function requiredAccessForPath(pathname: string, enabledFeatures?: Record
 }
 
 export function canAccessPath(pathname: string, user: AuthUser | null, enabledFeatures?: Record<string, boolean>): boolean {
+  if (REMOVED_PATHS.some((href) => matchesPath(pathname, href))) return false;
+
   // feature 守卫：路径关联了未启用的 feature → 不可访问
   const item = navItemForPath(pathname);
   if (item && !isFeatureEnabled(item.feature, enabledFeatures)) return false;

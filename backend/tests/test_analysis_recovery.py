@@ -772,6 +772,42 @@ async def test_analyze_batch_recovers_from_empty_llm_response(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_analyze_batch_uses_local_fallback_when_no_model_is_configured(monkeypatch):
+    from app.services.llm.provider import LlmNotConfiguredError
+
+    async def no_configured_model(*args, **kwargs):
+        raise LlmNotConfiguredError(routing_group="default")
+
+    monkeypatch.setattr(analysis, "call_llm_json", no_configured_model)
+    engine, session_factory = await _session_factory()
+
+    async with session_factory() as db:
+        db.add(
+            ContentItem(
+                id=1,
+                title="没有配置模型时仍可生成基础趋势",
+                url="https://example.com/local-analysis-fallback",
+                source_name="测试信源",
+                source_type="RSS",
+                status=ContentStatus.PENDING,
+                raw_content="本地安装没有配置 LLM，也应生成确定性的基础分析，供聚类和趋势快照使用。",
+            )
+        )
+        await db.commit()
+
+        results = await analysis.analyze_batch([1], db)
+        stored_analysis = await db.scalar(select(AiAnalysis).where(AiAnalysis.content_id == 1))
+        stored_content = await db.get(ContentItem, 1)
+
+    assert [item.content_id for item in results] == [1]
+    assert stored_analysis is not None
+    assert stored_analysis.summary_source == "local_fallback"
+    assert stored_analysis.final_model == "default"
+    assert stored_content.status == ContentStatus.ANALYZED
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_analysis_cascade_uses_lite_result_without_pro_when_confident(monkeypatch):
     monkeypatch.setattr(analysis.settings, "ANALYSIS_CASCADE_ENABLED", True)
     monkeypatch.setattr(analysis.settings, "ANALYSIS_LITE_ROUTING_GROUP", "analysis_lite")

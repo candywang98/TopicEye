@@ -35,6 +35,7 @@ from app.services.analysis_normalize import (
 )
 from app.services.content_read_cache import invalidate_content_read_caches
 from app.services.llm import call_llm_json, call_llm_json_with_metadata
+from app.services.llm.provider import LlmNotConfiguredError
 from app.services.llm.prompts.analysis import (
     ANALYSIS_PROMPT,
     ANALYSIS_PROMPT_EN,
@@ -483,15 +484,16 @@ async def analyze_content(content: ContentItem, db: AsyncSession) -> AiAnalysis:
             )
             final_model = final_metadata.get("actual_model") or final_model
         except Exception as llm_exc:
-            # CircuitOpenError (breaker tripped) and BadRequestError (400,
-            # e.g. GLM contentFilter code=1301) trigger local fallback.
-            # Other LLM failures (timeout, network, RuntimeError) still
-            # propagate up so the caller can record ERROR status + retry.
+            # CircuitOpenError (breaker tripped), BadRequestError (400,
+            # e.g. GLM contentFilter code=1301), and an intentionally
+            # unconfigured local installation trigger the deterministic
+            # fallback. Transient provider/network failures still propagate
+            # so the caller can record ERROR status and apply its retry policy.
             from litellm.exceptions import BadRequestError
 
             from app.services.llm.circuit_breaker import CircuitOpenError
 
-            if isinstance(llm_exc, CircuitOpenError | BadRequestError):
+            if isinstance(llm_exc, CircuitOpenError | BadRequestError | LlmNotConfiguredError):
                 logger.warning(
                     "LLM call failed for content id=%d (%s), using local fallback",
                     content.id,
